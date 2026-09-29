@@ -185,6 +185,18 @@ private fun NativePlexExoPlayer(
     var isBuffering by remember { mutableStateOf(true) }
     var showControls by remember { mutableStateOf(true) }
 
+    var targetResumeMs by remember { mutableStateOf(0L) }
+    var initialSeekDone by remember { mutableStateOf(false) }
+    var resumeNotification by remember { mutableStateOf<String?>(null) }
+
+    // Auto-dismiss resume notification after 5 seconds
+    LaunchedEffect(resumeNotification) {
+        if (resumeNotification != null) {
+            delay(5000)
+            resumeNotification = null
+        }
+    }
+
     // Remote navigation focus
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -241,18 +253,13 @@ private fun NativePlexExoPlayer(
             val mediaItem = MediaItem.fromUri(Uri.parse(resolved.streamUrl))
             val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
 
+            // Retrieve exact saved progress in ms
+            val savedProgress = viewModel.getMoviePlaybackProgress(movie.id).first()
+            targetResumeMs = savedProgress
+
             exoPlayer.setMediaSource(mediaSource)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
-
-            // Resume saved playback progress
-            viewModel.viewModelScope.launch {
-                val savedProgress = viewModel.getMoviePlaybackProgress(movie.id).first()
-                if (savedProgress > 0) {
-                    exoPlayer.seekTo(savedProgress)
-                    currentPosMs = savedProgress
-                }
-            }
         } catch (e: Exception) {
             Log.e("NativePlexExoPlayer", "Error preparing stream: ${e.message}", e)
             streamError = "Error al resolver la transmisión de vídeo: ${e.message}"
@@ -273,6 +280,16 @@ private fun NativePlexExoPlayer(
                         isBuffering = false
                         val dur = exoPlayer.duration
                         if (dur > 0) durationMs = dur
+
+                        // Resume exactly by minute and second where left off
+                        if (!initialSeekDone && targetResumeMs > 1500L) {
+                            initialSeekDone = true
+                            if (dur <= 0 || targetResumeMs < dur - 4000L) {
+                                exoPlayer.seekTo(targetResumeMs)
+                                currentPosMs = targetResumeMs
+                                resumeNotification = "Continuando en el minuto ${formatTime(targetResumeMs)}"
+                            }
+                        }
                     }
                     Player.STATE_ENDED -> {
                         isPlaying = false
@@ -299,6 +316,11 @@ private fun NativePlexExoPlayer(
 
         exoPlayer.addListener(listener)
         onDispose {
+            val finalPos = exoPlayer.currentPosition
+            val finalDur = exoPlayer.duration
+            if (finalPos > 1000L && finalDur > 0) {
+                viewModel.updatePlaybackProgress(movie.id, finalPos, finalDur)
+            }
             exoPlayer.removeListener(listener)
             exoPlayer.release()
         }
@@ -323,6 +345,11 @@ private fun NativePlexExoPlayer(
     // Action Helpers
     fun togglePlayPause() {
         if (exoPlayer.isPlaying) {
+            val pos = exoPlayer.currentPosition
+            val dur = exoPlayer.duration
+            if (pos > 0 && dur > 0) {
+                viewModel.updatePlaybackProgress(movie.id, pos, dur)
+            }
             exoPlayer.pause()
         } else {
             exoPlayer.play()
@@ -502,6 +529,54 @@ private fun NativePlexExoPlayer(
             }
         }
 
+        // Floating notification pill showing exact minute & second resumed
+        AnimatedVisibility(
+            visible = resumeNotification != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 80.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F1E36).copy(alpha = 0.95f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00A8E1)),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color(0xFF00A8E1),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = resumeNotification ?: "",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    TextButton(
+                        onClick = {
+                            exoPlayer.seekTo(0L)
+                            currentPosMs = 0L
+                            viewModel.updatePlaybackProgress(movie.id, 0L, durationMs)
+                            resumeNotification = null
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("Ver desde 0:00", color = Color(0xFF00A8E1), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // ========================================================
         // 100% CUSTOM PRIME VIDEO / PLEX CONTROLS OVERLAY
         // ========================================================
@@ -595,6 +670,28 @@ private fun NativePlexExoPlayer(
                                     fontSize = 11.sp
                                 )
                             }
+                        }
+                    }
+
+                    // Option to restart from 0:00 if playback is progressed
+                    if (currentPosMs > 5000L) {
+                        OutlinedButton(
+                            onClick = {
+                                exoPlayer.seekTo(0L)
+                                currentPosMs = 0L
+                                viewModel.updatePlaybackProgress(movie.id, 0L, durationMs)
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .tvFocusable(shape = RoundedCornerShape(16.dp), focusedScale = 1.05f)
+                                .testTag("player_restart_button")
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF00A8E1))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Desde 0:00", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

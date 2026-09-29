@@ -127,5 +127,39 @@ data class PlaybackProgress(
     val movieId: Int,
     val progressMs: Long,
     val durationMs: Long = 0,
-    val lastAccessed: Long = System.currentTimeMillis()
-)
+    val lastAccessed: Long = System.currentTimeMillis(),
+    val episodeIndex: Int = 0,
+    val episodeNumber: Int = 1,
+    val seasonNumber: Int = 1,
+    val episodeTitle: String = ""
+) {
+    fun formatProgressTime(): String {
+        val totalSeconds = (progressMs / 1000).coerceAtLeast(0)
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format(java.util.Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
+    }
+
+    fun formatDurationTime(): String {
+        if (durationMs <= 0) return ""
+        val totalSeconds = (durationMs / 1000).coerceAtLeast(0)
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format(java.util.Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
+    }
+
+    fun getProgressFraction(): Float {
+        if (durationMs <= 0) return 0f
+        return (progressMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    }
+}

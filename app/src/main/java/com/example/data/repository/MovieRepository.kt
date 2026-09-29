@@ -72,14 +72,28 @@ class MovieRepository(private val movieDao: MovieDao) {
     }
 
     fun getPlaybackProgress(profileId: Int, movieId: Int): Flow<PlaybackProgress?> = movieDao.getPlaybackProgress(profileId, movieId)
+    fun getPlaybackProgressForProfile(profileId: Int): Flow<List<PlaybackProgress>> = movieDao.getPlaybackProgressForProfile(profileId)
     
-    suspend fun savePlaybackProgress(profileId: Int, movieId: Int, progressMs: Long, durationMs: Long) {
+    suspend fun savePlaybackProgress(
+        profileId: Int,
+        movieId: Int,
+        progressMs: Long,
+        durationMs: Long,
+        episodeIndex: Int = 0,
+        episodeNumber: Int = 1,
+        seasonNumber: Int = 1,
+        episodeTitle: String = ""
+    ) {
         val progress = PlaybackProgress(
             profileId = profileId,
             movieId = movieId,
             progressMs = progressMs,
             durationMs = durationMs,
-            lastAccessed = System.currentTimeMillis()
+            lastAccessed = System.currentTimeMillis(),
+            episodeIndex = episodeIndex,
+            episodeNumber = episodeNumber,
+            seasonNumber = seasonNumber,
+            episodeTitle = episodeTitle
         )
         movieDao.insertPlaybackProgress(progress)
     }

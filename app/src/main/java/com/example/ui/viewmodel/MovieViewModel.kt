@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Movie
+import com.example.data.model.PlaybackProgress
 import com.example.data.model.Profile
 import com.example.data.repository.ImdbDetails
 import com.example.data.repository.MediaSuggestion
@@ -249,16 +250,43 @@ class MovieViewModel(
         return repository.isInWatchlist(profile.id, movieId)
     }
 
+    val allPlaybackProgresses: Flow<Map<Int, PlaybackProgress>> = _currentProfile.flatMapLatest { profile ->
+        if (profile == null) flowOf(emptyMap())
+        else repository.getPlaybackProgressForProfile(profile.id).map { list -> list.associateBy { it.movieId } }
+    }
+
     fun getMoviePlaybackProgress(movieId: Int): Flow<Long> {
         val profile = _currentProfile.value ?: return flowOf(0L)
         return repository.getPlaybackProgress(profile.id, movieId).map { it?.progressMs ?: 0L }
     }
 
-    fun updatePlaybackProgress(movieId: Int, progressMs: Long, durationMs: Long) {
+    fun getMoviePlaybackProgressDetails(movieId: Int): Flow<PlaybackProgress?> {
+        val profile = _currentProfile.value ?: return flowOf(null)
+        return repository.getPlaybackProgress(profile.id, movieId)
+    }
+
+    fun updatePlaybackProgress(
+        movieId: Int,
+        progressMs: Long,
+        durationMs: Long,
+        episodeIndex: Int = 0,
+        episodeNumber: Int = 1,
+        seasonNumber: Int = 1,
+        episodeTitle: String = ""
+    ) {
         val profile = _currentProfile.value ?: return
         viewModelScope.launch {
             if (progressMs > 0) {
-                repository.savePlaybackProgress(profile.id, movieId, progressMs, durationMs)
+                repository.savePlaybackProgress(
+                    profile.id,
+                    movieId,
+                    progressMs,
+                    durationMs,
+                    episodeIndex,
+                    episodeNumber,
+                    seasonNumber,
+                    episodeTitle
+                )
             }
         }
     }

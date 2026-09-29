@@ -58,6 +58,7 @@ fun DetailScreen(
 
     val inWatchlist by viewModel.isMovieInWatchlist(movieId).collectAsState(initial = false)
     val savedProgress by viewModel.getMoviePlaybackProgress(movieId).collectAsState(initial = 0L)
+    val progressDetails by viewModel.getMoviePlaybackProgressDetails(movieId).collectAsState(initial = null)
     val isRefreshingImdb by viewModel.isRefreshingImdb.collectAsState()
     val scrollState = rememberScrollState()
     val episodes = remember(movie.episodesJson) { movie.getEpisodes() }
@@ -197,44 +198,130 @@ fun DetailScreen(
 
                 val hasVideo = movie.videoUrl.isNotBlank()
 
-                // Main "Reproducir" (Play) Button
-                Button(
-                    onClick = {
-                        if (hasVideo) {
-                            onNavigateToPlayer(movie.id)
-                        } else {
-                            android.widget.Toast.makeText(
-                                context,
-                                "No se puede reproducir: este título está guardado en tu biblioteca sin enlace de vídeo.",
-                                android.widget.Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasVideo) Color(0xFF1A94FF) else Color(0xFF27354A), // Prime active blue or muted slate
-                        contentColor = if (hasVideo) Color.White else Color.LightGray
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .tvFocusable(
-                            shape = RoundedCornerShape(8.dp),
-                            focusedBorderColor = Color.White,
-                            focusedScale = 1.04f
+                // Main Action Buttons
+                val hasProgress = progressDetails != null && progressDetails!!.progressMs > 2000L
+
+                if (hasProgress && hasVideo) {
+                    // 1. Primary "Seguir viendo" Button with exact minute and second
+                    Button(
+                        onClick = { onNavigateToPlayer(movie.id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
+                            .testTag("resume_movie_button")
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Seguir viendo", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Seguir viendo desde ${progressDetails!!.formatProgressTime()}",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
-                        .testTag("play_movie_button")
-                ) {
-                    Icon(
-                        if (!hasVideo) Icons.Default.Info else if (savedProgress > 0) Icons.Default.Refresh else Icons.Default.PlayArrow,
-                        contentDescription = "Reproducir"
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (!hasVideo) "Sin enlace de reproducción disponible" else if (savedProgress > 0) "Reanudar contenido" else "Reproducir ahora",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    }
+
+                    // Progress track with exact minute and total duration
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Pausado en ${progressDetails!!.formatProgressTime()}" +
+                                        if (progressDetails!!.formatDurationTime().isNotBlank()) " de ${progressDetails!!.formatDurationTime()}" else "",
+                                color = Color.LightGray,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                text = "${(progressDetails!!.getProgressFraction() * 100).toInt()}% visto",
+                                color = Color(0xFFFF9900),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .background(Color.Gray.copy(alpha = 0.35f), RoundedCornerShape(2.dp))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(progressDetails!!.getProgressFraction().coerceIn(0.02f, 1f))
+                                    .background(Color(0xFFFF9900), RoundedCornerShape(2.dp))
+                            )
+                        }
+                    }
+
+                    // 2. Secondary "Empezar desde el principio" Button
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.updatePlaybackProgress(movie.id, 0L, progressDetails!!.durationMs)
+                            onNavigateToPlayer(movie.id)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
+                            .testTag("restart_movie_button")
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Empezar desde el principio (0:00)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                    // Standard Play Button when starting fresh
+                    Button(
+                        onClick = {
+                            if (hasVideo) {
+                                onNavigateToPlayer(movie.id)
+                            } else {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "No se puede reproducir: este título está guardado en tu biblioteca sin enlace de vídeo.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (hasVideo) Color(0xFF1A94FF) else Color(0xFF27354A),
+                            contentColor = if (hasVideo) Color.White else Color.LightGray
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .tvFocusable(
+                                shape = RoundedCornerShape(8.dp),
+                                focusedBorderColor = Color.White,
+                                focusedScale = 1.04f
+                            )
+                            .testTag("play_movie_button")
+                    ) {
+                        Icon(
+                            if (!hasVideo) Icons.Default.Info else Icons.Default.PlayArrow,
+                            contentDescription = "Reproducir"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (!hasVideo) "Sin enlace de reproducción disponible" else "Reproducir ahora",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 if (!hasVideo) {
@@ -548,12 +635,33 @@ fun DetailScreen(
                                                 Spacer(modifier = Modifier.width(12.dp))
 
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}",
-                                                        color = Color.White,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = "T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}",
+                                                            color = Color.White,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        val isThisEpisode = progressDetails != null &&
+                                                                ep.seasonNumber == progressDetails!!.seasonNumber &&
+                                                                ep.episodeNumber == progressDetails!!.episodeNumber &&
+                                                                progressDetails!!.progressMs > 2000L
+                                                        if (isThisEpisode) {
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Surface(
+                                                                shape = RoundedCornerShape(3.dp),
+                                                                color = Color(0xFFFF9900).copy(alpha = 0.25f)
+                                                            ) {
+                                                                Text(
+                                                                    text = "En progreso • ${progressDetails!!.formatProgressTime()}",
+                                                                    color = Color(0xFFFF9900),
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
                                                     if (ep.overview.isNotBlank()) {
                                                         Text(
                                                             text = ep.overview,

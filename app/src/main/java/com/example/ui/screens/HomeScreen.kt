@@ -304,7 +304,48 @@ fun HomeScreen(
                 }
             }
 
-            // 2. RECIENTEMENTE AÑADIDOS (Novedades en tu Biblioteca)
+            // 2. CONTINUAR VIENDO (Seguir viendo en el minuto y segundo exacto)
+            if (continueWatching.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Continuar viendo",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFF9900).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "En progreso",
+                                    color = Color(0xFFFF9900),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(continueWatching) { movie ->
+                                ContinueWatchingCard(movie, viewModel, onNavigateToDetail, onNavigateToPlayer)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. RECIENTEMENTE AÑADIDOS (Novedades en tu Biblioteca)
             // Displays all items sorted by addedAt descending so newly saved titles appear first!
             if (recentlyAdded.isNotEmpty()) {
                 item {
@@ -381,30 +422,6 @@ fun HomeScreen(
                         ) {
                             items(seriesList) { movie ->
                                 LandscapeMovieCard(movie, onNavigateToDetail)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 4. CONTINUE WATCHING (Seguir viendo)
-            if (continueWatching.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
-                        Text(
-                            text = "Continuar viendo",
-                            color = Color.White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(continueWatching) { movie ->
-                                ContinueWatchingCard(movie, viewModel, onNavigateToDetail, onNavigateToPlayer)
                             }
                         }
                     }
@@ -584,7 +601,7 @@ fun LandscapeMovieCard(
     }
 }
 
-// Continue watching card layout displaying saved progress index
+// Continue watching card layout displaying real progress timestamp and direct resume
 @Composable
 fun ContinueWatchingCard(
     movie: Movie,
@@ -593,20 +610,25 @@ fun ContinueWatchingCard(
     onPlayClick: (Int) -> Unit
 ) {
     val cardInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val progressDetails by viewModel.getMoviePlaybackProgressDetails(movie.id).collectAsState(initial = null)
+    val hasVideo = movie.videoUrl.isNotBlank()
+
     Card(
         modifier = Modifier
-            .width(190.dp)
-            .height(130.dp)
+            .width(200.dp)
+            .height(140.dp)
             .tvFocusable(
                 shape = RoundedCornerShape(8.dp),
                 focusedBorderColor = Color(0xFF00A8E1),
-                focusedScale = 1.08f,
+                focusedScale = 1.06f,
                 interactionSource = cardInteractionSource
             )
             .clickable(
                 interactionSource = cardInteractionSource,
                 indication = null
-            ) { onDetailClick(movie.id) },
+            ) {
+                if (hasVideo) onPlayClick(movie.id) else onDetailClick(movie.id)
+            },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1F2E4A))
     ) {
@@ -623,20 +645,50 @@ fun ContinueWatchingCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Hover play icon button
+                // Timestamp Badge Overlay
+                val timeLabel = progressDetails?.formatProgressTime() ?: "00:00"
+                Surface(
+                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                    color = Color.Black.copy(alpha = 0.8f),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(Color(0xFFFF9900), RoundedCornerShape(3.dp))
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (movie.category == "Series" && (progressDetails?.episodeNumber ?: 0) > 0) {
+                                "T${progressDetails?.seasonNumber ?: 1}:E${progressDetails?.episodeNumber ?: 1} • $timeLabel"
+                            } else {
+                                "Minuto $timeLabel"
+                            },
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Play icon button
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.2f)),
+                        .background(Color.Black.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
                 ) {
                     IconButton(
                         onClick = { onPlayClick(movie.id) },
                         modifier = Modifier
-                            .size(36.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(18.dp))
+                            .size(38.dp)
+                            .background(Color.Black.copy(alpha = 0.7f), shape = RoundedCornerShape(19.dp))
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Reanudar", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Reanudar", tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
             }
@@ -646,7 +698,7 @@ fun ContinueWatchingCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF0F1E36))
-                    .padding(6.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
                 Text(
                     text = movie.title,
@@ -656,20 +708,36 @@ fun ContinueWatchingCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                // Static thin progress bar (Prime styled orange/blue bar)
+
+                val timeRemaining = if (progressDetails != null && progressDetails!!.durationMs > progressDetails!!.progressMs) {
+                    val remainingMs = progressDetails!!.durationMs - progressDetails!!.progressMs
+                    val remMin = (remainingMs / 1000) / 60
+                    if (remMin > 0) "Quedan $remMin min • En ${progressDetails?.formatProgressTime()}" else "En ${progressDetails?.formatProgressTime()}"
+                } else {
+                    "Seguir viendo en ${progressDetails?.formatProgressTime() ?: "0:00"}"
+                }
+
+                Text(
+                    text = timeRemaining,
+                    color = Color(0xFF00A8E1),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                // Dynamic progress bar reflecting real progress fraction
+                val frac = progressDetails?.getProgressFraction() ?: 0.1f
                 Box(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .fillMaxWidth()
                         .height(3.dp)
-                        .background(Color.Gray.copy(alpha = 0.3f))
+                        .background(Color.Gray.copy(alpha = 0.35f), RoundedCornerShape(2.dp))
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
-                            .fillMaxWidth(0.55f) // Hardcoded progression factor representational index
-                            .background(Color(0xFFFF9900)) // Prime Progress Orange
+                            .fillMaxWidth(frac.coerceIn(0.05f, 1f))
+                            .background(Color(0xFFFF9900), RoundedCornerShape(2.dp))
                     )
                 }
             }
