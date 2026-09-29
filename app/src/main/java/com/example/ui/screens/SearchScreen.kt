@@ -200,7 +200,7 @@ fun SearchScreen(
                                         modifier = Modifier.align(Alignment.TopEnd)
                                     ) {
                                         Text(
-                                            text = "${movie.imdbRating} ★",
+                                            text = "IMDb ${movie.imdbRating} ★",
                                             color = Color.Black,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Black,

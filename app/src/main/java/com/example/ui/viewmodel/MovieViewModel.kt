@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Movie
 import com.example.data.model.Profile
+import com.example.data.repository.ImdbDetails
 import com.example.data.repository.MediaSuggestion
 import com.example.data.repository.MetadataService
 import com.example.data.repository.MovieRepository
@@ -17,6 +18,51 @@ class MovieViewModel(
     private val repository: MovieRepository,
     private val metadataService: MetadataService = MetadataService()
 ) : ViewModel() {
+
+    private val _isRefreshingImdb = MutableStateFlow(false)
+    val isRefreshingImdb: StateFlow<Boolean> = _isRefreshingImdb.asStateFlow()
+
+    fun fetchImdbForMovie(movieId: Int) {
+        viewModelScope.launch {
+            _isRefreshingImdb.value = true
+            try {
+                val movie = repository.getMovieByIdDirect(movieId) ?: return@launch
+                val isTv = movie.category.equals("Series", ignoreCase = true)
+                val imdbData = if (movie.imdbId.startsWith("tt")) {
+                    metadataService.fetchImdbDetails(movie.imdbId, isTv)
+                } else {
+                    metadataService.fetchImdbByTitle(movie.title, isTv)
+                }
+
+                if (imdbData.rating.isNotBlank()) {
+                    val updated = movie.copy(
+                        imdbRating = imdbData.rating,
+                        imdbId = if (movie.imdbId.isBlank()) imdbData.imdbId else movie.imdbId
+                    )
+                    repository.insertMovie(updated)
+                }
+            } catch (_: Exception) {
+            } finally {
+                _isRefreshingImdb.value = false
+            }
+        }
+    }
+
+    fun fetchImdbForDraft(
+        title: String,
+        imdbId: String,
+        isTv: Boolean,
+        onResult: (ImdbDetails) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = if (imdbId.startsWith("tt")) {
+                metadataService.fetchImdbDetails(imdbId, isTv)
+            } else {
+                metadataService.fetchImdbByTitle(title, isTv)
+            }
+            onResult(result)
+        }
+    }
 
     // All available profiles
     val profiles = repository.allProfiles

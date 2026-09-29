@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.components.ImdbScoreCard
 import com.example.ui.viewmodel.MovieViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +57,7 @@ fun DetailScreen(
 
     val inWatchlist by viewModel.isMovieInWatchlist(movieId).collectAsState(initial = false)
     val savedProgress by viewModel.getMoviePlaybackProgress(movieId).collectAsState(initial = 0L)
+    val isRefreshingImdb by viewModel.isRefreshingImdb.collectAsState()
     val scrollState = rememberScrollState()
     val episodes = remember(movie.episodesJson) { movie.getEpisodes() }
 
@@ -359,7 +361,17 @@ fun DetailScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Ficha Oficial de Calificación y Crítica de IMDb
+                ImdbScoreCard(
+                    movie = movie,
+                    onRefreshRating = { viewModel.fetchImdbForMovie(movie.id) },
+                    isRefreshing = isRefreshingImdb,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Description Title (TMDB)
                 Row(verticalAlignment = Alignment.CenterVertically) {

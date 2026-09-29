@@ -84,6 +84,34 @@ data class Movie(
     val addedAt: Long = System.currentTimeMillis()
 ) {
     fun getEpisodes(): List<EpisodeData> = EpisodeData.listFromJson(episodesJson)
+
+    fun getImdbScoreFormatted(): String {
+        val r = imdbRating.trim()
+        if (r.isEmpty()) return ""
+        return "$r / 10"
+    }
+
+    fun getImdbScorePercentage(): Int {
+        val r = imdbRating.toDoubleOrNull() ?: return 0
+        return (r * 10).toInt().coerceIn(0, 100)
+    }
+
+    fun getImdbScoreLabel(): String {
+        val r = imdbRating.toDoubleOrNull() ?: return ""
+        return when {
+            r >= 9.0 -> "Obra Maestra Universal"
+            r >= 8.5 -> "Top IMDb • Excelente"
+            r >= 7.8 -> "Aclamada por la Crítica"
+            r >= 7.0 -> "Muy Buena Valoración"
+            r >= 6.0 -> "Buena Valoración"
+            r >= 5.0 -> "Valoración Media"
+            else -> "Regular"
+        }
+    }
+
+    fun getImdbUrl(): String {
+        return if (imdbId.startsWith("tt")) "https://www.imdb.com/title/$imdbId" else ""
+    }
 }
 
 @Entity(tableName = "watchlist", primaryKeys = ["profileId", "movieId"])

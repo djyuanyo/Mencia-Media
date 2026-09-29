@@ -57,6 +57,7 @@ fun AddMovieScreen(
     var episodesList by remember { mutableStateOf<List<EpisodeData>>(emptyList()) }
     var metadataSource by remember { mutableStateOf("TMDB + IMDb + TheTVDB") }
     var isFeatured by remember { mutableStateOf(false) }
+    var isFetchingImdbScore by remember { mutableStateOf(false) }
 
     var appliedSourceNotice by remember { mutableStateOf<String?>(null) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
@@ -711,6 +712,50 @@ fun AddMovieScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Live IMDb score fetcher button & visual status
+            Button(
+                onClick = {
+                    if (title.isBlank() && imdbId.isBlank()) {
+                        Toast.makeText(context, "Escribe primero un título o ID de IMDb", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    isFetchingImdbScore = true
+                    viewModel.fetchImdbForDraft(title, imdbId, category == "Series") { details ->
+                        isFetchingImdbScore = false
+                        if (details.rating.isNotBlank()) {
+                            imdbRating = details.rating
+                            if (details.imdbId.isNotBlank()) imdbId = details.imdbId
+                            if (details.duration.isNotBlank() && duration == "120 min") duration = details.duration
+                            if (details.genre.isNotBlank() && genre == "Acción") genre = details.genre
+                            Toast.makeText(context, "IMDb: ${details.rating} ★ (${details.scoreLabel})", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "No se encontró puntuación en IMDb para este título", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5C518)),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .testTag("fetch_imdb_button")
+            ) {
+                if (isFetchingImdbScore) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Consultando puntuación en IMDb...", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        if (imdbRating.isNotBlank()) "Actualizar valoración IMDb (${imdbRating} ★)" else "Obtener puntuación oficial de IMDb en vivo",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             // 6. ACTORS / REPARTO (TMDB)

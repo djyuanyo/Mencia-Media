@@ -164,6 +164,34 @@ fun HomeScreen(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+
+                                if (movie.imdbRating.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFF5C518)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "IMDb",
+                                                color = Color.Black,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = "${movie.imdbRating} ★",
+                                                color = Color.Black,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+                                }
+
                                 if (!hasVideo) {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Surface(

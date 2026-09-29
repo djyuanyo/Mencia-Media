@@ -24,7 +24,19 @@ data class MediaSuggestion(
     val imdbRating: String = "", // e.g. "8.8"
     val imdbId: String = "", // e.g. "tt1375666"
     val tmdbId: String = "", // e.g. "27205"
-    val episodes: List<EpisodeData> = emptyList() // TheTVDB episode ordering
+    val episodes: List<EpisodeData> = emptyList(), // TheTVDB episode ordering
+    val awards: String = "" // e.g. "Ganadora de 4 Premios Oscar"
+)
+
+data class ImdbDetails(
+    val rating: String = "", // e.g. "8.8"
+    val scorePercentage: Int = 0,
+    val scoreLabel: String = "", // e.g. "Top IMDb • Excelente"
+    val awards: String = "", // e.g. "Ganadora de 4 Premios Oscar"
+    val imdbId: String = "", // e.g. "tt1375666"
+    val year: String = "",
+    val duration: String = "",
+    val genre: String = ""
 )
 
 class MetadataService {
@@ -251,7 +263,8 @@ class MetadataService {
                                     imdbRating = imdbRatingFormatted,
                                     imdbId = imdbId,
                                     tmdbId = id.toString(),
-                                    episodes = episodesList
+                                    episodes = episodesList,
+                                    awards = ""
                                 )
                             )
                         }
@@ -297,7 +310,18 @@ class MetadataService {
                                 val imageObj = item.optJSONObject("i")
                                 val posterUrl = imageObj?.optString("imageUrl") ?: ""
 
-                                val desc = "Ficha oficial de IMDb ($imdbId). Puntuación y reparto verificado en la base de datos cinematográfica de IMDb."
+                                // Fetch verified live IMDb rating & awards from Cinemeta API
+                                val imdbDetails = fetchImdbDetails(imdbId, isTv)
+                                val resolvedRating = imdbDetails.rating.ifEmpty { "8.0" }
+                                val awardsText = imdbDetails.awards
+                                val durationText = imdbDetails.duration.ifEmpty { if (isTv) "45 min" else "120 min" }
+                                val genreText = imdbDetails.genre.ifEmpty { if (isTv) "Serie IMDb" else "Cine IMDb" }
+
+                                val desc = if (awardsText.isNotBlank()) {
+                                    "Ficha oficial de IMDb ($imdbId). $awardsText."
+                                } else {
+                                    "Ficha oficial de IMDb ($imdbId). Puntuación ${resolvedRating}/10 y reparto verificado en la base de datos cinematográfica de IMDb."
+                                }
 
                                 results.add(
                                     MediaSuggestion(
@@ -305,15 +329,16 @@ class MetadataService {
                                         description = desc,
                                         posterUrl = posterUrl,
                                         category = if (isTv) "Series" else "Películas",
-                                        genre = if (isTv) "Serie IMDb" else "Cine IMDb",
-                                        year = year,
-                                        duration = if (isTv) "45 min" else "120 min",
+                                        genre = genreText,
+                                        year = imdbDetails.year.ifEmpty { year },
+                                        duration = durationText,
                                         cast = if (stars.isNotBlank()) "Estrellas IMDb: $stars" else "Elenco registrado en IMDb",
                                         source = "IMDb Database",
-                                        imdbRating = "8.4", // Default high rating for IMDb highlighted entries
+                                        imdbRating = resolvedRating,
                                         imdbId = imdbId,
                                         tmdbId = "",
-                                        episodes = emptyList()
+                                        episodes = emptyList(),
+                                        awards = awardsText
                                     )
                                 )
                             }
@@ -361,12 +386,23 @@ class MetadataService {
                             val year = if (premiered.length >= 4) premiered.substring(0, 4) else "2024"
 
                             val ratingObj = show.optJSONObject("rating")
-                            val tvRating = ratingObj?.optDouble("average", 8.2) ?: 8.2
+                            var tvRating = ratingObj?.optDouble("average", 8.2) ?: 8.2
 
                             // External IDs
                             val ext = show.optJSONObject("externals")
                             val tvdbId = ext?.optInt("thetvdb", 0)?.toString() ?: ""
                             val imdbId = ext?.optString("imdb", "") ?: ""
+
+                            var awardsText = ""
+                            var resolvedRating = String.format(Locale.US, "%.1f", tvRating)
+
+                            if (imdbId.startsWith("tt")) {
+                                val imdbDetails = fetchImdbDetails(imdbId, isTv = true)
+                                if (imdbDetails.rating.isNotBlank()) {
+                                    resolvedRating = imdbDetails.rating
+                                }
+                                awardsText = imdbDetails.awards
+                            }
 
                             // Parse the episodes embedded list (Orden TheTVDB)
                             val embedded = show.optJSONObject("_embedded")
@@ -405,10 +441,11 @@ class MetadataService {
                                     duration = "${orderedEpisodes.size} episodios",
                                     cast = "Elenco verificado en TheTVDB & TMDB",
                                     source = "TheTVDB (Orden Oficial de Episodios)",
-                                    imdbRating = String.format(Locale.US, "%.1f", tvRating),
+                                    imdbRating = resolvedRating,
                                     imdbId = imdbId,
                                     tmdbId = tvdbId,
-                                    episodes = orderedEpisodes
+                                    episodes = orderedEpisodes,
+                                    awards = awardsText
                                 )
                             )
                         }
@@ -421,5 +458,136 @@ class MetadataService {
 
         // Deduplicate suggestions by normalized title and prioritize entries with rich details & TMDB/TheTVDB
         results.distinctBy { it.title.lowercase().trim() }
+    }
+
+    /**
+     * Calculates the critique score quality label based on numeric IMDb rating.
+     */
+    fun calculateScoreLabel(ratingStr: String): String {
+        val r = ratingStr.toDoubleOrNull() ?: return ""
+        return when {
+            r >= 9.0 -> "Obra Maestra Universal"
+            r >= 8.5 -> "Top IMDb • Excelente"
+            r >= 7.8 -> "Aclamada por la Crítica"
+            r >= 7.0 -> "Muy Buena Valoración"
+            r >= 6.0 -> "Buena Valoración"
+            r >= 5.0 -> "Valoración Media"
+            else -> "Regular"
+        }
+    }
+
+    /**
+     * Calculates percentage score (0-100) from an IMDb 0-10 rating.
+     */
+    fun calculateScorePercentage(ratingStr: String): Int {
+        val r = ratingStr.toDoubleOrNull() ?: return 0
+        return (r * 10).toInt().coerceIn(0, 100)
+    }
+
+    /**
+     * Fetches verified IMDb ratings, scores, awards, and details using Cinemeta & IMDb endpoints.
+     */
+    suspend fun fetchImdbDetails(
+        imdbId: String,
+        isTv: Boolean = false
+    ): ImdbDetails = withContext(Dispatchers.IO) {
+        val cleanId = imdbId.trim()
+        if (!cleanId.startsWith("tt")) return@withContext ImdbDetails()
+
+        val primaryType = if (isTv) "series" else "movie"
+        val secondaryType = if (isTv) "movie" else "series"
+
+        var details = queryCinemeta(cleanId, primaryType)
+        if (details.rating.isBlank()) {
+            details = queryCinemeta(cleanId, secondaryType)
+        }
+
+        details
+    }
+
+    private fun queryCinemeta(imdbId: String, type: String): ImdbDetails {
+        return try {
+            val url = "https://v3-cinemeta.strem.io/meta/$type/$imdbId.json"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Android PrimePlex/IMDb)")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return ImdbDetails(imdbId = imdbId)
+                val body = resp.body?.string() ?: return ImdbDetails(imdbId = imdbId)
+                val json = JSONObject(body)
+                val meta = json.optJSONObject("meta") ?: return ImdbDetails(imdbId = imdbId)
+
+                val rawRating = meta.optString("imdbRating", "").ifEmpty {
+                    val doubleRating = meta.optDouble("imdbRating", 0.0)
+                    if (doubleRating > 0.0) String.format(Locale.US, "%.1f", doubleRating) else ""
+                }
+                val awards = meta.optString("awards", "")
+                val runtime = meta.optString("runtime", "")
+                val year = meta.optString("year", "")
+                val genreArray = meta.optJSONArray("genre")
+                val genre = if (genreArray != null && genreArray.length() > 0) genreArray.optString(0) else ""
+
+                ImdbDetails(
+                    rating = rawRating,
+                    scorePercentage = calculateScorePercentage(rawRating),
+                    scoreLabel = calculateScoreLabel(rawRating),
+                    awards = awards,
+                    imdbId = imdbId,
+                    year = year,
+                    duration = runtime,
+                    genre = genre
+                )
+            }
+        } catch (_: Exception) {
+            ImdbDetails(imdbId = imdbId)
+        }
+    }
+
+    /**
+     * Resolves IMDb details by title query (searches IMDb suggestion index, then fetches scores).
+     */
+    suspend fun fetchImdbByTitle(
+        title: String,
+        isTv: Boolean = false
+    ): ImdbDetails = withContext(Dispatchers.IO) {
+        val clean = extractTitle(title)
+        if (clean.isBlank()) return@withContext ImdbDetails()
+
+        try {
+            val slug = clean.lowercase().trim().replace(Regex("[^a-z0-9]"), "_")
+            if (slug.isEmpty()) return@withContext ImdbDetails()
+            val firstChar = slug.first()
+            val imdbUrl = "https://v3.sg.media-imdb.com/suggestion/$firstChar/$slug.json"
+            val req = Request.Builder()
+                .url(imdbUrl)
+                .header("User-Agent", "Mozilla/5.0 (Android PrimePlex/IMDb)")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val json = JSONObject(body)
+                        val items = json.optJSONArray("d") ?: JSONArray()
+                        for (i in 0 until minOf(items.length(), 3)) {
+                            val item = items.getJSONObject(i)
+                            val imdbId = item.optString("id", "")
+                            if (imdbId.startsWith("tt")) {
+                                val itemType = item.optString("q", "")
+                                val tvDetected = isTv || itemType.contains("tv", ignoreCase = true) || itemType.contains("series", ignoreCase = true)
+                                val details = fetchImdbDetails(imdbId, tvDetected)
+                                if (details.rating.isNotBlank()) {
+                                    return@withContext details
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        ImdbDetails()
     }
 }

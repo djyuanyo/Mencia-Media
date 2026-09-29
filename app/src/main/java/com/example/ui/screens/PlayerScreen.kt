@@ -2,10 +2,19 @@ package com.example.ui.screens
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.VideoView
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -33,8 +43,6 @@ import com.example.ui.viewmodel.MovieViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.io.UnsupportedEncodingException
-import java.net.URLDecoder
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +64,10 @@ fun PlayerScreen(
         onDispose {
             activity?.requestedOrientation = previousOrientation
         }
+    }
+
+    BackHandler {
+        onNavigateBack()
     }
 
     if (movie == null) {
@@ -115,6 +127,247 @@ fun PlayerScreen(
         return
     }
 
+    val isDriveLink = remember(movie.videoUrl) { isGoogleDriveUrl(movie.videoUrl) }
+    var useWebPlayer by remember(movie.videoUrl) { mutableStateOf(isDriveLink) }
+
+    if (useWebPlayer) {
+        GoogleDriveWebPlayer(
+            movie = movie,
+            onNavigateBack = onNavigateBack,
+            onSwitchToNative = { useWebPlayer = false }
+        )
+    } else {
+        NativeVideoPlayer(
+            movie = movie,
+            viewModel = viewModel,
+            onNavigateBack = onNavigateBack,
+            onSwitchToWebPlayer = { useWebPlayer = true }
+        )
+    }
+}
+
+/**
+ * Dedicated Hardware-Accelerated Web Stream Player for Google Drive videos.
+ * Uses Google Drive's official HTML5 streaming embed player (/preview), which supports
+ * on-the-fly video transcoding, audio, subtitles, seek bar, and resolution switching.
+ */
+@Composable
+private fun GoogleDriveWebPlayer(
+    movie: Movie,
+    onNavigateBack: () -> Unit,
+    onSwitchToNative: () -> Unit
+) {
+    val context = LocalContext.current
+    val previewUrl = remember(movie.videoUrl) { getGoogleDrivePreviewUrl(movie.videoUrl) }
+    var isPageLoading by remember { mutableStateOf(true) }
+    var showOverlayControls by remember { mutableStateOf(true) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var customViewContainer by remember { mutableStateOf<View?>(null) }
+
+    // Auto-hide top overlay controls after 4 seconds
+    LaunchedEffect(showOverlayControls) {
+        if (showOverlayControls) {
+            delay(4500)
+            showOverlayControls = false
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.destroy()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .testTag("google_drive_player_container")
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                showOverlayControls = !showOverlayControls
+            }
+    ) {
+        // Embedded Android WebView for Google Drive HTML5 Player
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    setBackgroundColor(android.graphics.Color.BLACK)
+
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        allowFileAccess = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        builtInZoomControls = false
+                        displayZoomControls = false
+                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+                    }
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            isPageLoading = true
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            isPageLoading = false
+                        }
+                    }
+
+                    webChromeClient = object : WebChromeClient() {
+                        private var customView: View? = null
+                        private var customCallback: CustomViewCallback? = null
+
+                        override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                            customView = view
+                            customCallback = callback
+                            customViewContainer = view
+                        }
+
+                        override fun onHideCustomView() {
+                            customView = null
+                            customCallback?.onCustomViewHidden()
+                            customViewContainer = null
+                        }
+                    }
+
+                    loadUrl(previewUrl)
+                    webViewRef = this
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Loading spinner while the Google Drive player prepares
+        if (isPageLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color(0xFF1A94FF), strokeWidth = 3.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Cargando reproductor de Google Drive...", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Conectando con streaming oficial de Drive", color = Color.LightGray, fontSize = 11.sp)
+                }
+            }
+        }
+
+        // Amazon Prime-styled Header Overlay Controls
+        AnimatedVisibility(
+            visible = showOverlayControls,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.size(36.dp).testTag("drive_player_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Column {
+                        Text(
+                            text = movie.title,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(3.dp),
+                                color = Color(0xFF1A73E8)
+                            ) {
+                                Text(
+                                    text = "Google Drive Stream",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
+                            if (movie.imdbRating.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "IMDb ${movie.imdbRating} ★",
+                                    color = Color(0xFFF5C518),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Open in Google Drive App / External Browser Button
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(movie.videoUrl))
+                            context.startActivity(intent)
+                        },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        modifier = Modifier.height(34.dp).padding(end = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("App Drive", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Refresh stream button
+                    IconButton(
+                        onClick = { webViewRef?.reload() },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Recargar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Native Android VideoView Player with custom Prime Video playback controls.
+ * Used for direct MP4, MKV, HLS, or WordPress video streams.
+ */
+@Composable
+private fun NativeVideoPlayer(
+    movie: Movie,
+    viewModel: MovieViewModel,
+    onNavigateBack: () -> Unit,
+    onSwitchToWebPlayer: () -> Unit
+) {
+    val context = LocalContext.current
     var videoViewRef by remember { mutableStateOf<VideoView?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var currentPos by remember { mutableStateOf(0L) }
@@ -122,6 +375,8 @@ fun PlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val processedUrl = remember(movie.videoUrl) { cleanDirectVideoUrl(movie.videoUrl) }
 
     // Auto-hide controls after 4 seconds
     LaunchedEffect(showControls, isPlaying) {
@@ -131,7 +386,7 @@ fun PlayerScreen(
         }
     }
 
-    // Coroutine to periodically save playback progress in the database and feed slider
+    // Coroutine to periodically save playback progress in Room database
     LaunchedEffect(isPlaying, videoViewRef) {
         while (isPlaying && videoViewRef != null) {
             val progress = videoViewRef?.currentPosition?.toLong() ?: 0L
@@ -140,16 +395,11 @@ fun PlayerScreen(
                 currentPos = progress
                 if (total > 0) {
                     duration = total
-                    viewModel.updatePlaybackProgress(movieId, progress, total)
+                    viewModel.updatePlaybackProgress(movie.id, progress, total)
                 }
             }
             delay(1000)
         }
-    }
-
-    // Process the video url
-    val processedUrl = remember(movie.videoUrl) {
-        cleanVideoUrl(movie.videoUrl)
     }
 
     Box(
@@ -172,13 +422,11 @@ fun PlayerScreen(
                     setOnPreparedListener { mp ->
                         isBuffering = false
                         duration = mp.duration.toLong()
-                        
                         mp.start()
                         isPlaying = true
-                        
-                        // Fetch the starting position
+
                         viewModel.viewModelScope.launch {
-                            val saved = viewModel.getMoviePlaybackProgress(movieId).first()
+                            val saved = viewModel.getMoviePlaybackProgress(movie.id).first()
                             if (saved > 0 && saved < duration - 5000) {
                                 seekTo(saved.toInt())
                                 currentPos = saved
@@ -190,14 +438,14 @@ fun PlayerScreen(
                         isPlaying = false
                         errorMessage = when (extra) {
                             -1004 -> "Error de conexión de red"
-                            -1010 -> "Formato de video no soportado"
-                            else -> "Este enlace requiere reproducción externa o navegador"
+                            -1010 -> "Formato de video no soportado directamente"
+                            else -> "Este medio requiere streaming web o reproductor externo"
                         }
                         true
                     }
                     setOnCompletionListener {
                         isPlaying = false
-                        viewModel.clearPlaybackProgress(movieId)
+                        viewModel.clearPlaybackProgress(movie.id)
                         onNavigateBack()
                     }
                 }
@@ -209,7 +457,7 @@ fun PlayerScreen(
         )
 
         // Buffering Indicator
-        if (isBuffering) {
+        if (isBuffering && errorMessage == null) {
             CircularProgressIndicator(
                 color = Color(0xFF1A94FF),
                 modifier = Modifier
@@ -218,66 +466,67 @@ fun PlayerScreen(
             )
         }
 
-        // Error message handling
+        // Error message handling with fallback options
         if (errorMessage != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.85f))
+                    .background(Color.Black.copy(alpha = 0.9f))
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.widthIn(max = 520.dp)
+                ) {
                     Icon(
                         Icons.Default.Warning,
                         contentDescription = "Error",
-                        tint = Color.Red,
-                        modifier = Modifier.size(56.dp)
+                        tint = Color(0xFFFFA000),
+                        modifier = Modifier.size(52.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         "No se pudo reproducir este medio directamente",
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "URL: ${movie.videoUrl}",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        maxLines = 1
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Razón: ${errorMessage}. Enlaces de Google Drive necesitan ser públicos o directos. Puedes abrirlos externamente desde los detalles.",
+                        "Razón: $errorMessage.",
                         color = Color.LightGray,
-                        fontSize = 13.sp,
-                        modifier = Modifier.widthIn(max = 500.dp)
+                        fontSize = 13.sp
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Button(
                             onClick = onNavigateBack,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
                         ) {
                             Text("Volver", color = Color.White)
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        if (movie.videoUrl.contains("drive.google.com")) {
-                            val webIntent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                Uri.parse(movie.videoUrl)
-                            )
-                            val ctx = LocalContext.current
-                            Button(
-                                onClick = {
-                                    ctx.startActivity(webIntent)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF))
-                            ) {
-                                Text("Abrir en Navegador / Drive")
-                            }
+
+                        Button(
+                            onClick = onSwitchToWebPlayer,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF))
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Reproductor Web Integrado")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(movie.videoUrl))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        ) {
+                            Text("Abrir Externamente")
                         }
                     }
                 }
@@ -299,73 +548,71 @@ fun PlayerScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.5f), shape = MaterialTheme.shapes.small)
-                            .testTag("player_back_button")
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag("video_back_button")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = movie.title,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (movie.imdbRating.isNotBlank()) {
+                                Text(
+                                    text = "IMDb ${movie.imdbRating} ★ • ${movie.genre}",
+                                    color = Color(0xFFF5C518),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column {
-                        Text(
-                            text = movie.title,
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${movie.genre} • ${movie.year} • ${movie.duration}",
-                            color = Color.LightGray,
-                            fontSize = 13.sp
-                        )
+                    if (isGoogleDriveUrl(movie.videoUrl)) {
+                        TextButton(onClick = onSwitchToWebPlayer) {
+                            Text("Modo Drive Web", color = Color(0xFF00A8E1), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
-                // Center Seek Controls (skip back, Play/Pause, skip forward)
+                // Center Play / Pause Controls
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(48.dp)
+                    horizontalArrangement = Arrangement.spacedBy(36.dp)
                 ) {
-                    // Rewind 10s (re-purposed using Refresh icon)
                     IconButton(
                         onClick = {
                             videoViewRef?.let {
-                                var target = it.currentPosition - 10000
-                                if (target < 0) target = 0
+                                val target = (it.currentPosition - 10000).coerceAtLeast(0)
                                 it.seekTo(target)
                                 currentPos = target.toLong()
                             }
                         },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.extraLarge)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Retroceder 10s",
-                            tint = Color.White,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        Icon(Icons.Default.Refresh, contentDescription = "Retroceder 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }
 
-                    // Play / Pause (using Clear as pause/stop and PlayArrow as resume)
                     IconButton(
                         onClick = {
                             videoViewRef?.let {
-                                if (it.isPlaying) {
+                                if (isPlaying) {
                                     it.pause()
                                     isPlaying = false
                                 } else {
@@ -375,56 +622,45 @@ fun PlayerScreen(
                             }
                         },
                         modifier = Modifier
-                            .size(72.dp)
-                            .background(Color(0xFF1A94FF), shape = MaterialTheme.shapes.extraLarge)
-                            .testTag("player_play_pause_button")
+                            .size(64.dp)
+                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(32.dp))
+                            .testTag("play_pause_button")
                     ) {
                         Icon(
-                            if (isPlaying) Icons.Default.Clear else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pausa" else "Reproducir",
                             tint = Color.White,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(40.dp)
                         )
                     }
 
-                    // Forward 10s (re-purposed using PlayArrow icon)
                     IconButton(
                         onClick = {
                             videoViewRef?.let {
-                                var target = it.currentPosition + 10000
-                                if (target > duration) target = duration.toInt()
+                                val target = (it.currentPosition + 10000).coerceAtMost(duration.toInt())
                                 it.seekTo(target)
                                 currentPos = target.toLong()
                             }
                         },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.extraLarge)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Adelantar 10s",
-                            tint = Color.White,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Avanzar 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }
                 }
 
-                // Bottom Timeline progress seeking
+                // Bottom Timeline & Scrubber Bar
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
                         .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .align(Alignment.BottomCenter)
                 ) {
                     Slider(
-                        value = if (duration > 0) currentPos.toFloat() / duration.toFloat() else 0f,
-                        onValueChange = { percent ->
-                            videoViewRef?.let {
-                                val target = (percent * duration).toInt()
-                                it.seekTo(target)
-                                currentPos = target.toLong()
-                            }
+                        value = if (duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
+                        onValueChange = { fraction ->
+                            val target = (fraction * duration).toInt()
+                            videoViewRef?.seekTo(target)
+                            currentPos = target.toLong()
                         },
                         colors = SliderDefaults.colors(
                             thumbColor = Color(0xFF1A94FF),
@@ -463,21 +699,39 @@ private fun formatTime(millis: Long): String {
     return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
 
-// Convert sharing Google Drive URLs or direct WordPress URLs to working streams
-fun cleanVideoUrl(url: String): String {
-    var clean = url.trim()
-    if (clean.contains("drive.google.com/file/d/")) {
-        val parts = clean.split("/file/d/")
-        if (parts.size > 1) {
-            val idPart = parts[1].split("/")[0]
-            return "https://drive.google.com/uc?export=download&id=$idPart"
-        }
-    } else if (clean.contains("drive.google.com/open?id=")) {
-        val parts = clean.split("id=")
-        if (parts.size > 1) {
-            val idPart = parts[1].split("&")[0]
-            return "https://drive.google.com/uc?export=download&id=$idPart"
-        }
+/**
+ * Checks if a given URL is a Google Drive file link.
+ */
+fun isGoogleDriveUrl(url: String): Boolean {
+    val lower = url.lowercase().trim()
+    return lower.contains("drive.google.com") || lower.contains("docs.google.com")
+}
+
+/**
+ * Extracts Google Drive alphanumeric file identifier.
+ */
+fun extractGoogleDriveFileId(url: String): String? {
+    val regex = Regex("(?:/file/d/|id=|open\\?id=)([a-zA-Z0-9_-]{20,})")
+    return regex.find(url.trim())?.groupValues?.get(1)
+}
+
+/**
+ * Returns Google Drive's official HTML5 streaming embed URL (/preview)
+ * which streams smoothly on mobile WebViews with transcoding and player controls.
+ */
+fun getGoogleDrivePreviewUrl(url: String): String {
+    val id = extractGoogleDriveFileId(url)
+    return if (id != null) "https://drive.google.com/file/d/$id/preview" else url.trim()
+}
+
+/**
+ * Normalizes direct WordPress, HTTP, or direct video URLs.
+ */
+fun cleanDirectVideoUrl(url: String): String {
+    val clean = url.trim()
+    val driveId = extractGoogleDriveFileId(clean)
+    if (driveId != null) {
+        return "https://drive.google.com/uc?export=download&id=$driveId"
     }
     return clean
 }
