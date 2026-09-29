@@ -611,8 +611,24 @@ fun AddMovieScreen(
                 lineHeight = 16.sp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp, start = 4.dp)
+                    .padding(bottom = 8.dp, start = 4.dp)
             )
+
+            if (com.example.util.GoogleDriveStreamResolver.isGoogleDriveUrl(videoUrl)) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color(0xFF00A8E1).copy(alpha = 0.2f),
+                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
+                ) {
+                    Text(
+                        "✓ Enlace de Google Drive detectado: se reproducirá directamente con ExoPlayer HD",
+                        color = Color(0xFF00A8E1),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
 
             // 3. TITLE OF MEDIA
             OutlinedTextField(

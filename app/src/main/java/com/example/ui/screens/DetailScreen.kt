@@ -514,6 +514,7 @@ fun DetailScreen(
                                             color = Color(0xFF1E2E4A),
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.02f)
                                                 .clickable {
                                                     if (hasVideo) {
                                                         onNavigateToPlayer(movie.id)

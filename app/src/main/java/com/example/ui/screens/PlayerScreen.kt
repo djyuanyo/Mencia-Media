@@ -4,18 +4,17 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
-import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.VideoView
 import androidx.activity.compose.BackHandler
+import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -44,23 +43,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import com.example.data.model.Movie
 import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 import com.example.util.DeviceUtils
 import com.example.util.GoogleDriveStreamResolver
+import com.example.util.ResolvedStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * PrimePlex Custom Video Player.
- * Delivers an immediate playback experience for all video streams,
- * including public Google Drive files, with a 100% custom Prime Video player
- * interface (no Google Drive web controls and no Google Play dialogs).
+ * PrimePlex Custom Video Player using ExoPlayer (Media3).
+ * Directly plays Google Drive, MP4, HLS, or WordPress videos with custom Prime Video controls.
+ * Guarantees immediate playback without opening external apps or Google Play dialogs.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     movieId: Int,
@@ -71,7 +78,7 @@ fun PlayerScreen(
     val movieState = viewModel.allMovies.collectAsState().value
     val movie = movieState.find { it.id == movieId }
 
-    // Lock orientation to Landscape for cinematic viewing on mobile; on TV keep system landscape
+    // Lock orientation to Landscape for cinematic viewing on phone; on TV keep system landscape
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val isTv = DeviceUtils.isTv(context)
@@ -147,8 +154,8 @@ fun PlayerScreen(
         return
     }
 
-    // Unified Custom Prime Player
-    PrimeCustomPlayer(
+    // Unified Custom ExoPlayer Player
+    PrimeExoPlayer(
         movie = movie,
         viewModel = viewModel,
         onNavigateBack = onNavigateBack
@@ -156,36 +163,52 @@ fun PlayerScreen(
 }
 
 /**
- * Unified Custom Player Engine for PrimePlex.
- * Directly plays Google Drive, MP4, HLS, or WordPress videos with custom Prime Video controls.
+ * PrimePlex Native Video Engine using ExoPlayer (Media3).
+ * Plays Google Drive files directly via resolved stream links, with full custom controls.
  */
+@OptIn(UnstableApi::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun PrimeCustomPlayer(
+private fun PrimeExoPlayer(
     movie: Movie,
     viewModel: MovieViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val isGoogleDrive = remember(movie.videoUrl) { GoogleDriveStreamResolver.isGoogleDriveUrl(movie.videoUrl) }
-    var resolvedDirectUrl by remember { mutableStateOf<String?>(null) }
-    var isResolving by remember { mutableStateOf(isGoogleDrive) }
 
-    // Player playback state
-    var isPlaying by remember { mutableStateOf(true) }
+    // Stream resolution state
+    var resolvedStream by remember { mutableStateOf<ResolvedStream?>(null) }
+    var isResolving by remember { mutableStateOf(true) }
+    var streamError by remember { mutableStateOf<String?>(null) }
+    var useWebFallback by remember { mutableStateOf(false) }
+
+    // Playback state
+    var isPlaying by remember { mutableStateOf(false) }
     var currentPosMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
     var isBuffering by remember { mutableStateOf(true) }
     var showControls by remember { mutableStateOf(true) }
-    var useWebEngineFallback by remember { mutableStateOf(false) }
 
-    // References to underlying video engines
-    var videoViewRef by remember { mutableStateOf<VideoView?>(null) }
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-
-    // Focus requester for TV D-Pad remote control
+    // Remote navigation focus
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    // Build ExoPlayer instance
+    val exoPlayer = remember {
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(20000)
+            .setReadTimeoutMs(20000)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(httpDataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
     }
 
     // Auto-hide controls overlay after 4 seconds of playback
@@ -196,70 +219,142 @@ private fun PrimeCustomPlayer(
         }
     }
 
-    // Step 1: Pre-resolve direct stream URL for Google Drive links
+    // Resolve Google Drive or direct stream URL
     LaunchedEffect(movie.videoUrl) {
-        if (isGoogleDrive) {
-            isResolving = true
-            val direct = GoogleDriveStreamResolver.resolveDirectStreamUrl(movie.videoUrl)
-            resolvedDirectUrl = direct
+        isResolving = true
+        streamError = null
+        try {
+            val resolved = GoogleDriveStreamResolver.resolveStream(movie.videoUrl)
+            resolvedStream = resolved
             isResolving = false
-        } else {
-            resolvedDirectUrl = movie.videoUrl.trim()
+
+            // Configure ExoPlayer with resolved stream
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(25000)
+                .setReadTimeoutMs(25000)
+
+            if (!resolved.cookieHeader.isNullOrBlank()) {
+                httpDataSourceFactory.setDefaultRequestProperties(mapOf("Cookie" to resolved.cookieHeader))
+            }
+
+            val mediaSourceFactory = DefaultMediaSourceFactory(httpDataSourceFactory)
+            val mediaItem = MediaItem.fromUri(Uri.parse(resolved.streamUrl))
+            val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
+
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+
+            // Resume saved progress
+            viewModel.viewModelScope.launch {
+                val savedProgress = viewModel.getMoviePlaybackProgress(movie.id).first()
+                if (savedProgress > 0) {
+                    exoPlayer.seekTo(savedProgress)
+                    currentPosMs = savedProgress
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PrimeExoPlayer", "Error preparing stream: ${e.message}", e)
+            streamError = e.message
             isResolving = false
+            if (isGoogleDrive) {
+                useWebFallback = true
+            }
         }
     }
 
-    // Periodically save playback progress in Room database
-    LaunchedEffect(isPlaying, currentPosMs) {
-        if (currentPosMs > 0 && durationMs > 0) {
-            viewModel.updatePlaybackProgress(movie.id, currentPosMs, durationMs)
+    // Attach ExoPlayer Listener
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> {
+                        isBuffering = true
+                    }
+                    Player.STATE_READY -> {
+                        isBuffering = false
+                        val dur = exoPlayer.duration
+                        if (dur > 0) durationMs = dur
+                    }
+                    Player.STATE_ENDED -> {
+                        isPlaying = false
+                        viewModel.clearPlaybackProgress(movie.id)
+                        onNavigateBack()
+                    }
+                    Player.STATE_IDLE -> {
+                        isBuffering = false
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                if (playing) isBuffering = false
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.w("PrimeExoPlayer", "ExoPlayer playback error (${error.errorCodeName}): ${error.message}")
+                isBuffering = false
+                if (isGoogleDrive && !useWebFallback) {
+                    // Fall back smoothly to secure in-app Drive engine without leaving the app
+                    useWebFallback = true
+                } else {
+                    streamError = "No se pudo reproducir este archivo de vídeo."
+                }
+            }
+        }
+
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    // Periodic position updater and progress saver
+    LaunchedEffect(exoPlayer, isPlaying) {
+        while (true) {
+            if (exoPlayer.playbackState == Player.STATE_READY) {
+                val pos = exoPlayer.currentPosition
+                val dur = exoPlayer.duration
+                if (pos >= 0) currentPosMs = pos
+                if (dur > 0) durationMs = dur
+                if (pos > 0 && dur > 0 && isPlaying) {
+                    viewModel.updatePlaybackProgress(movie.id, pos, dur)
+                }
+            }
+            delay(1000)
         }
     }
 
     // Action Helpers
     fun togglePlayPause() {
-        if (useWebEngineFallback) {
-            val script = if (isPlaying) {
-                "var v = document.querySelector('video'); if (v) { v.pause(); }"
-            } else {
-                "var v = document.querySelector('video'); if (v) { v.play(); }"
-            }
-            webViewRef?.evaluateJavascript(script, null)
+        if (useWebFallback) {
             isPlaying = !isPlaying
         } else {
-            videoViewRef?.let {
-                if (isPlaying) {
-                    it.pause()
-                    isPlaying = false
-                } else {
-                    it.start()
-                    isPlaying = true
-                }
+            if (exoPlayer.isPlaying) {
+                exoPlayer.pause()
+            } else {
+                exoPlayer.play()
             }
         }
         showControls = true
     }
 
     fun seekRelative(deltaMs: Long) {
-        val target = (currentPosMs + deltaMs).coerceIn(0L, if (durationMs > 0) durationMs else Long.MAX_VALUE)
-        if (useWebEngineFallback) {
-            val targetSec = target / 1000.0
-            webViewRef?.evaluateJavascript("var v = document.querySelector('video'); if (v) { v.currentTime = $targetSec; }", null)
-            currentPosMs = target
-        } else {
-            videoViewRef?.seekTo(target.toInt())
+        if (!useWebFallback) {
+            val target = (exoPlayer.currentPosition + deltaMs).coerceIn(0L, exoPlayer.duration.coerceAtLeast(0L))
+            exoPlayer.seekTo(target)
             currentPosMs = target
         }
         showControls = true
     }
 
     fun seekAbsolute(targetMs: Long) {
-        if (useWebEngineFallback) {
-            val targetSec = targetMs / 1000.0
-            webViewRef?.evaluateJavascript("var v = document.querySelector('video'); if (v) { v.currentTime = $targetSec; }", null)
-            currentPosMs = targetMs
-        } else {
-            videoViewRef?.seekTo(targetMs.toInt())
+        if (!useWebFallback) {
+            exoPlayer.seekTo(targetMs)
             currentPosMs = targetMs
         }
         showControls = true
@@ -316,66 +411,27 @@ private fun PrimeCustomPlayer(
                 showControls = !showControls
             }
     ) {
-        // Underlying Video Engine
-        if (!useWebEngineFallback && resolvedDirectUrl != null && !isResolving) {
-            // Engine A: Hardware Native Android VideoView
+        // Video View Render Layer
+        if (!useWebFallback) {
+            // Native ExoPlayer View with Hardware Decoding
             AndroidView(
                 factory = { ctx ->
-                    VideoView(ctx).apply {
-                        val uri = Uri.parse(resolvedDirectUrl)
-                        setVideoURI(uri)
-                        setOnPreparedListener { mp ->
-                            isBuffering = false
-                            durationMs = mp.duration.toLong()
-                            mp.start()
-                            isPlaying = true
-
-                            // Resume saved position if present
-                            viewModel.viewModelScope.launch {
-                                val saved = viewModel.getMoviePlaybackProgress(movie.id).first()
-                                if (saved > 0 && saved < durationMs - 5000) {
-                                    seekTo(saved.toInt())
-                                    currentPosMs = saved
-                                }
-                            }
-                        }
-                        setOnErrorListener { _, what, extra ->
-                            Log.w("PrimeCustomPlayer", "VideoView playback error ($what, $extra). Switching smoothly to headless stream engine.")
-                            // Fallback smoothly to custom headless web engine (never shows Google Play)
-                            useWebEngineFallback = true
-                            true
-                        }
-                        setOnCompletionListener {
-                            isPlaying = false
-                            viewModel.clearPlaybackProgress(movie.id)
-                            onNavigateBack()
-                        }
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false // Use our Prime Video Compose controls
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
                     }
-                },
-                update = { view ->
-                    videoViewRef = view
                 },
                 modifier = Modifier.fillMaxSize()
             )
-
-            // Periodic progress tracking for Native VideoView
-            LaunchedEffect(isPlaying, videoViewRef) {
-                while (isPlaying && videoViewRef != null && !useWebEngineFallback) {
-                    val pos = videoViewRef?.currentPosition?.toLong() ?: 0L
-                    val dur = videoViewRef?.duration?.toLong() ?: 0L
-                    if (pos > 0) currentPosMs = pos
-                    if (dur > 0) durationMs = dur
-                    delay(1000)
-                }
-            }
-        } else if (useWebEngineFallback || (isGoogleDrive && resolvedDirectUrl == null && !isResolving)) {
-            // Engine B: Headless HTML5 Media Engine
-            // Strips all Google Drive controls, branding, and "Open in Google Play" buttons with CSS/JS injection
-            val drivePreviewUrl = remember(movie.videoUrl) {
-                val fileId = GoogleDriveStreamResolver.extractGoogleDriveFileId(movie.videoUrl)
-                if (fileId != null) "https://drive.google.com/file/d/$fileId/preview" else movie.videoUrl.trim()
-            }
-
+        } else {
+            // Protected In-App Drive Stream Fallback
+            // Strictly blocks all Google Play redirects and keeps playback in-app
+            val previewUrl = resolvedStream?.previewUrl ?: movie.videoUrl.trim()
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
@@ -394,102 +450,46 @@ private fun PrimeCustomPlayer(
                             userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                         }
 
-                        // Javascript bridge to receive video playback updates
-                        addJavascriptInterface(object {
-                            @JavascriptInterface
-                            fun onProgress(posSeconds: Float, durSeconds: Float) {
-                                currentPosMs = (posSeconds * 1000).toLong()
-                                if (durSeconds > 0) durationMs = (durSeconds * 1000).toLong()
-                                isBuffering = false
-                            }
-
-                            @JavascriptInterface
-                            fun onPlayState(playing: Boolean) {
-                                isPlaying = playing
-                                isBuffering = false
-                            }
-                        }, "PrimeBridge")
-
                         webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val url = request?.url?.toString() ?: ""
+                                // STRICTLY PREVENT any redirection to Google Play or external app store
+                                if (url.contains("play.google.com") || url.startsWith("market:") || url.contains("store")) {
+                                    Log.d("PrimeExoPlayer", "Blocked external Google Play redirect: $url")
+                                    return true // Block external launch
+                                }
+                                return false
+                            }
+
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 isBuffering = false
                                 isPlaying = true
-
-                                // CSS and JS injection to:
-                                // 1. Hide all Google Drive UI, banners, popout buttons, and Play Store links.
-                                // 2. Make video element fill the screen completely.
-                                // 3. Auto-play video immediately.
-                                // 4. Stream position back to our custom Prime Video controls overlay.
-                                val injectionJs = """
-                                    (function() {
-                                        var style = document.createElement('style');
-                                        style.innerHTML = `
-                                            .drive-viewer-toolstrip, .drive-viewer-popout-button, .ytp-chrome-top, .ytp-chrome-bottom,
-                                            .gb_a, .drive-viewer-navigation-button, .drive-viewer-action-bar, .goog-inline-block,
-                                            .ndfHFb-c4YZDc-Wrql6b, a[href*='play.google.com'], a[href*='drive.google.com'],
-                                            .drive-viewer-toolstrip-inner, .drive-viewer-popout {
-                                                display: none !important;
-                                                opacity: 0 !important;
-                                                visibility: hidden !important;
-                                                pointer-events: none !important;
-                                            }
-                                            body, html {
-                                                background-color: #000 !important;
-                                                overflow: hidden !important;
-                                                margin: 0 !important;
-                                                padding: 0 !important;
-                                            }
-                                            video {
-                                                position: fixed !important;
-                                                top: 0 !important;
-                                                left: 0 !important;
-                                                width: 100vw !important;
-                                                height: 100vh !important;
-                                                object-fit: contain !important;
-                                                z-index: 1000 !important;
-                                                background: #000 !important;
-                                            }
-                                        `;
-                                        document.head.appendChild(style);
-
-                                        function bindVideo() {
-                                            var v = document.querySelector('video');
-                                            if (v) {
-                                                v.autoplay = true;
-                                                v.play().catch(function(){});
-                                                v.addEventListener('timeupdate', function() {
-                                                    if (window.PrimeBridge) {
-                                                        window.PrimeBridge.onProgress(v.currentTime, v.duration || 0);
-                                                    }
-                                                });
-                                                v.addEventListener('play', function() {
-                                                    if (window.PrimeBridge) window.PrimeBridge.onPlayState(true);
-                                                });
-                                                v.addEventListener('pause', function() {
-                                                    if (window.PrimeBridge) window.PrimeBridge.onPlayState(false);
-                                                });
-                                            } else {
-                                                setTimeout(bindVideo, 400);
-                                            }
+                                // Clean Google Drive chrome and hide popouts
+                                val cssInjection = """
+                                    var style = document.createElement('style');
+                                    style.innerHTML = `
+                                        .drive-viewer-toolstrip, .drive-viewer-popout-button, .ytp-chrome-top,
+                                        .gb_a, a[href*='play.google.com'], .ndfHFb-c4YZDc-Wrql6b {
+                                            display: none !important;
+                                            opacity: 0 !important;
                                         }
-                                        bindVideo();
-                                    })();
+                                        body, html { background: #000 !important; margin: 0 !important; }
+                                    `;
+                                    document.head.appendChild(style);
                                 """.trimIndent()
-
-                                view?.evaluateJavascript(injectionJs, null)
+                                view?.evaluateJavascript(cssInjection, null)
                             }
                         }
 
                         webChromeClient = object : WebChromeClient() {}
-                        loadUrl(drivePreviewUrl)
-                        webViewRef = this
+                        loadUrl(previewUrl)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Buffering Indicator
+        // Loading & Buffering Spinner
         if (isBuffering || isResolving) {
             Box(
                 modifier = Modifier
@@ -505,13 +505,13 @@ private fun PrimeCustomPlayer(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Iniciando reproducción directa...",
+                        text = if (isResolving) "Conectando stream de Google Drive..." else "Cargando reproductor ExoPlayer...",
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Conectando reproductor personalizado PrimePlex",
+                        text = "Reproductor personalizado PrimePlex HD",
                         color = Color.LightGray,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -520,9 +520,65 @@ private fun PrimeCustomPlayer(
             }
         }
 
+        // Error Banner
+        if (streamError != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFE50914),
+                        modifier = Modifier.size(52.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Error de reproducción",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "El enlace de Google Drive requiere que los permisos del archivo estén configurados como \"Cualquier persona con el enlace puede ver/descargar\".",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = {
+                                useWebFallback = !useWebFallback
+                                streamError = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Probar modo alternativo", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = onNavigateBack,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Volver", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+
         // ========================================================
         // 100% CUSTOM PRIME VIDEO CONTROLS OVERLAY
-        // Never shows Google Drive branding or Google Play buttons
         // ========================================================
         AnimatedVisibility(
             visible = showControls,
@@ -535,9 +591,9 @@ private fun PrimeCustomPlayer(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.8f),
+                                Color.Black.copy(alpha = 0.85f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.85f)
+                                Color.Black.copy(alpha = 0.9f)
                             )
                         )
                     )
@@ -582,7 +638,7 @@ private fun PrimeCustomPlayer(
                                     color = Color(0xFF00A8E1)
                                 ) {
                                     Text(
-                                        text = "HD • PrimePlex",
+                                        text = if (useWebFallback) "WEB • PrimePlex" else "EXOPLAYER HD",
                                         color = Color.Black,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Black,
@@ -612,6 +668,37 @@ private fun PrimeCustomPlayer(
                                     text = "${movie.year} • ${movie.genre}",
                                     color = Color.LightGray,
                                     fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Mode switch toggle button (allows switching between ExoPlayer and Web Engine)
+                    if (isGoogleDrive) {
+                        Surface(
+                            onClick = {
+                                useWebFallback = !useWebFallback
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White.copy(alpha = 0.15f),
+                            modifier = Modifier.tvFocusable(shape = RoundedCornerShape(16.dp), focusedScale = 1.05f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00A8E1),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (useWebFallback) "Cambiar a ExoPlayer" else "Modo Web",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -757,7 +844,7 @@ private fun PrimeCustomPlayer(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = formatTime(durationMs),
+                            text = if (durationMs > 0) formatTime(durationMs) else "--:--",
                             color = Color.LightGray,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
@@ -770,7 +857,7 @@ private fun PrimeCustomPlayer(
 }
 
 /**
- * Formats milliseconds to a human-readable mm:ss or hh:mm:ss format.
+ * Formats milliseconds to mm:ss or hh:mm:ss.
  */
 private fun formatTime(millis: Long): String {
     if (millis <= 0) return "0:00"
