@@ -7,10 +7,16 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compilar y Publicar APK
     runs-on: ubuntu-latest
+
+    env:
+      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
 
     steps:
       - name: Descargar repositorio
@@ -25,13 +31,19 @@ jobs:
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Restaurar debug.keystore
+        run: |
+          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
       - name: Dar permisos de ejecución a gradlew
         run: chmod +x gradlew || true
 
       - name: Compilar APK (Debug)
-        run: ./gradlew assembleDebug --stacktrace -Djava.awt.headless=true
+        run: ./gradlew assembleDebug --no-daemon --stacktrace -Djava.awt.headless=true
 
-      - name: Renombrar APK
+      - name: Preparar APK
         run: |
           mkdir -p release-apk
           cp app/build/outputs/apk/debug/app-debug.apk release-apk/PrimePlex-debug.apk
@@ -52,7 +64,7 @@ jobs:
           body: |
             ### 🎬 PrimePlex Android APK
             Versión generada automáticamente desde el código fuente del proyecto.
-            
+
             **Descarga el archivo APK adjunto:**
             * Haz clic en `PrimePlex-debug.apk` abajo para descargar e instalar directamente en tu móvil o tablet Android.
           files: release-apk/PrimePlex-debug.apk
