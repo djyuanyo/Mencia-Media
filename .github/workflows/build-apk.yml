@@ -15,9 +15,6 @@ jobs:
     name: Compilar y Publicar APK
     runs-on: ubuntu-latest
 
-    env:
-      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
-
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -31,17 +28,30 @@ jobs:
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Restaurar debug.keystore
+      - name: Preparar entorno y licencias
         run: |
-          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+          touch .env
+          yes | sdkmanager --licenses || true
+
+      - name: Asegurar debug.keystore
+        run: |
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              echo "Decodificando debug.keystore.base64..."
+              base64 -d debug.keystore.base64 > debug.keystore || true
+            fi
           fi
+          if [ ! -f debug.keystore ]; then
+            echo "Generando debug.keystore de respaldo..."
+            keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          ls -la debug.keystore
 
       - name: Dar permisos de ejecución a gradlew
         run: chmod +x gradlew || true
 
       - name: Compilar APK (Debug)
-        run: ./gradlew assembleDebug --no-daemon --stacktrace -Djava.awt.headless=true
+        run: ./gradlew assembleDebug --stacktrace -Pkotlin.compiler.execution.strategy=daemon
 
       - name: Preparar APK
         run: |
@@ -56,18 +66,20 @@ jobs:
           retention-days: 30
 
       - name: Publicar Release en GitHub con el archivo APK
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
-          tag_name: latest
-          name: "PrimePlex - Última Versión APK"
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "PrimePlex v1.0.${{ github.run_number }}"
           body: |
             ### 🎬 PrimePlex Android APK
-            Versión generada automáticamente desde el código fuente del proyecto.
+            Versión generada automáticamente desde el código fuente del proyecto (Build #${{ github.run_number }}).
 
-            **Descarga el archivo APK adjunto:**
-            * Haz clic en `PrimePlex-debug.apk` abajo para descargar e instalar directamente en tu móvil o tablet Android.
+            **Descarga:**
+            * Haz clic en `PrimePlex-debug.apk` abajo para descargar e instalar en tu dispositivo Android.
           files: release-apk/PrimePlex-debug.apk
           prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
