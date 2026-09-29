@@ -16,17 +16,19 @@ data class ResolvedStream(
     val streamUrl: String,
     val cookieHeader: String? = null,
     val isGoogleDrive: Boolean = false,
-    val fileId: String? = null,
-    val previewUrl: String? = null
+    val fileId: String? = null
 )
 
 /**
  * Resolver for Google Drive video streams.
- * Resolves direct media streaming URLs and authentication cookies from public Google Drive links
- * so videos can play instantly in ExoPlayer without opening external apps or Google Play.
+ * Resolves direct media streaming URLs and session cookies from public Google Drive links
+ * so ExoPlayer can stream the raw video directly with hardware decoding,
+ * completely avoiding any embedded Google Drive web players or Google Play popups.
  */
 object GoogleDriveStreamResolver {
     private const val TAG = "DriveStreamResolver"
+    private const val BROWSER_USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     // Thread-safe in-memory cookie storage
     private class SimpleMemoryCookieJar : CookieJar {
@@ -53,11 +55,6 @@ object GoogleDriveStreamResolver {
                 }
             }
             return list
-        }
-
-        fun getCookieHeaderFor(url: HttpUrl): String {
-            val cookies = loadForRequest(url)
-            return cookies.joinToString("; ") { "${it.name}=${it.value}" }
         }
 
         fun getAllCookiesHeader(): String {
@@ -136,20 +133,17 @@ object GoogleDriveStreamResolver {
                 streamUrl = clean,
                 cookieHeader = null,
                 isGoogleDrive = true,
-                fileId = null,
-                previewUrl = clean
+                fileId = null
             )
         }
 
-        val previewUrl = "https://drive.google.com/file/d/$fileId/preview"
-        val candidateDownloadUrl = "https://drive.usercontent.google.com/download?id=$fileId&export=download&authuser=0&confirm=t"
-        val googleUcUrl = "https://drive.google.com/uc?export=download&id=$fileId&confirm=t"
+        // Primary download endpoints on drive.google.com that initiate authentication and redirect
+        val initialUrl = "https://drive.google.com/uc?id=$fileId&export=download&confirm=t"
 
         try {
-            // First step: Attempt to query the direct download endpoint
             val request = Request.Builder()
-                .url(candidateDownloadUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                .url(initialUrl)
+                .header("User-Agent", BROWSER_USER_AGENT)
                 .header("Accept", "*/*")
                 .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .get()
@@ -160,25 +154,25 @@ object GoogleDriveStreamResolver {
                 val contentType = response.header("Content-Type") ?: ""
                 val cookies = cookieJar.getAllCookiesHeader()
 
-                // Check if response is directly serving media
-                if (contentType.startsWith("video/") ||
-                    contentType.startsWith("application/octet-stream") ||
-                    (response.isSuccessful && !contentType.contains("text/html"))
+                // If redirected to drive.usercontent.google.com and it's video or binary data
+                if (finalUrl.contains("drive.usercontent.google.com") &&
+                    (contentType.startsWith("video/") ||
+                     contentType.startsWith("application/octet-stream") ||
+                     !contentType.contains("text/html"))
                 ) {
-                    Log.d(TAG, "Direct video media stream found: $finalUrl ($contentType)")
+                    Log.d(TAG, "Direct Google Drive video stream found via redirect: $finalUrl ($contentType)")
                     return@withContext ResolvedStream(
                         streamUrl = finalUrl,
                         cookieHeader = cookies.ifBlank { null },
                         isGoogleDrive = true,
-                        fileId = fileId,
-                        previewUrl = previewUrl
+                        fileId = fileId
                     )
                 }
 
-                // If HTML is returned, it may be the Google Drive virus scan warning page with confirm tokens
+                // If response is HTML, it may be the Google Drive virus scan warning for files > 100MB
                 val htmlBody = response.body?.string() ?: ""
 
-                // 1. Look for form action in the warning page
+                // 1. Look for form action in warning page
                 val formActionRegex = Regex("""<form[^>]*action=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
                 val formActionMatch = formActionRegex.find(htmlBody)
 
@@ -203,13 +197,26 @@ object GoogleDriveStreamResolver {
                         val separator = if (actionUrl.contains("?")) "&" else "?"
                         val fullStreamUrl = "$actionUrl$separator${queryParams.joinToString("&")}"
                         Log.d(TAG, "Form confirm stream URL resolved: $fullStreamUrl")
-                        return@withContext ResolvedStream(
-                            streamUrl = fullStreamUrl,
-                            cookieHeader = cookies.ifBlank { null },
-                            isGoogleDrive = true,
-                            fileId = fileId,
-                            previewUrl = previewUrl
-                        )
+
+                        // Follow redirect on the confirmed action URL
+                        val confirmReq = Request.Builder()
+                            .url(fullStreamUrl)
+                            .header("User-Agent", BROWSER_USER_AGENT)
+                            .header("Accept", "*/*")
+                            .head()
+                            .build()
+
+                        client.newCall(confirmReq).execute().use { confirmResp ->
+                            val confirmedFinal = confirmResp.request.url.toString()
+                            val updatedCookies = cookieJar.getAllCookiesHeader()
+                            Log.d(TAG, "Confirmed final video stream URL: $confirmedFinal")
+                            return@withContext ResolvedStream(
+                                streamUrl = confirmedFinal,
+                                cookieHeader = updatedCookies.ifBlank { null },
+                                isGoogleDrive = true,
+                                fileId = fileId
+                            )
+                        }
                     }
                 }
 
@@ -223,8 +230,7 @@ object GoogleDriveStreamResolver {
                         streamUrl = streamUrl,
                         cookieHeader = cookies.ifBlank { null },
                         isGoogleDrive = true,
-                        fileId = fileId,
-                        previewUrl = previewUrl
+                        fileId = fileId
                     )
                 }
 
@@ -238,31 +244,7 @@ object GoogleDriveStreamResolver {
                         streamUrl = streamUrl,
                         cookieHeader = cookies.ifBlank { null },
                         isGoogleDrive = true,
-                        fileId = fileId,
-                        previewUrl = previewUrl
-                    )
-                }
-            }
-
-            // Step 2: Fallback check on standard Google UC link
-            val request2 = Request.Builder()
-                .url(googleUcUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                .header("Accept", "*/*")
-                .get()
-                .build()
-
-            client.newCall(request2).execute().use { response ->
-                val finalUrl = response.request.url.toString()
-                val cookies = cookieJar.getAllCookiesHeader()
-                if (finalUrl.contains("drive.usercontent.google.com")) {
-                    Log.d(TAG, "UC redirect resolved: $finalUrl")
-                    return@withContext ResolvedStream(
-                        streamUrl = finalUrl,
-                        cookieHeader = cookies.ifBlank { null },
-                        isGoogleDrive = true,
-                        fileId = fileId,
-                        previewUrl = previewUrl
+                        fileId = fileId
                     )
                 }
             }
@@ -270,14 +252,14 @@ object GoogleDriveStreamResolver {
             Log.e(TAG, "Exception resolving Google Drive stream: ${e.message}", e)
         }
 
-        // Default candidate URL
+        // Direct candidate URL fallback on drive.usercontent.google.com
+        val fallbackDirectUrl = "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=t"
         val cookies = cookieJar.getAllCookiesHeader()
         return@withContext ResolvedStream(
-            streamUrl = candidateDownloadUrl,
+            streamUrl = fallbackDirectUrl,
             cookieHeader = cookies.ifBlank { null },
             isGoogleDrive = true,
-            fileId = fileId,
-            previewUrl = previewUrl
+            fileId = fileId
         )
     }
 
