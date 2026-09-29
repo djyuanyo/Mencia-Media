@@ -1,0 +1,61 @@
+name: Generar APK de PrimePlex
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compilar y Publicar APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Dar permisos de ejecución a gradlew
+        run: chmod +x gradlew || true
+
+      - name: Compilar APK (Debug)
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Renombrar APK
+        run: |
+          mkdir -p release-apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/PrimePlex-debug.apk
+
+      - name: Subir artefacto APK para descarga directa
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimePlex-APK
+          path: release-apk/PrimePlex-debug.apk
+          retention-days: 30
+
+      - name: Publicar Release en GitHub con el archivo APK
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "PrimePlex - Última Versión APK"
+          body: |
+            ### 🎬 PrimePlex Android APK
+            Versión generada automáticamente desde el código fuente del proyecto.
+            
+            **Descarga el archivo APK adjunto:**
+            * Haz clic en `PrimePlex-debug.apk` abajo para descargar e instalar directamente en tu móvil o tablet Android.
+          files: release-apk/PrimePlex-debug.apk
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
