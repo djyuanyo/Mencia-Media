@@ -632,12 +632,20 @@ private fun PrimeCustomPlayer(
                             .tvFocusable(shape = RoundedCornerShape(26.dp), focusedScale = 1.15f)
                             .testTag("custom_player_rewind_button")
                     ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Retroceder 10s",
-                            tint = Color.White,
-                            modifier = Modifier.size(34.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Retroceder 10s",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
+                            Text(
+                                text = "10",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Main Center Play / Pause
@@ -656,12 +664,32 @@ private fun PrimeCustomPlayer(
                             )
                             .testTag("custom_player_play_pause_button")
                     ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pausa" else "Reproducir",
-                            tint = Color.White,
-                            modifier = Modifier.size(44.dp)
-                        )
+                        if (isPlaying) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(6.dp)
+                                        .height(26.dp)
+                                        .background(Color.White, RoundedCornerShape(2.dp))
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .width(6.dp)
+                                        .height(26.dp)
+                                        .background(Color.White, RoundedCornerShape(2.dp))
+                                )
+                            }
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Reproducir",
+                                tint = Color.White,
+                                modifier = Modifier.size(44.dp)
+                            )
+                        }
                     }
 
                     // Forward 10s
@@ -672,12 +700,20 @@ private fun PrimeCustomPlayer(
                             .tvFocusable(shape = RoundedCornerShape(26.dp), focusedScale = 1.15f)
                             .testTag("custom_player_forward_button")
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Avanzar 10s",
-                            tint = Color.White,
-                            modifier = Modifier.size(34.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Avanzar 10s",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
+                            Text(
+                                text = "+10",
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
