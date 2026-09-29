@@ -1,0 +1,6 @@
+{
+  "name": "PrimePlex",
+  "description": "Una aplicación de streaming de películas estilo Plex TV con el elegante diseño de Amazon Prime Video. Permite añadir películas mediante enlaces de Google Drive o WordPress, gestionar múltiples perfiles independientes con control parental y guardar el progreso real de reproducción.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
