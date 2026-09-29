@@ -140,6 +140,18 @@ class MovieViewModel(
         viewModelScope.launch {
             repository.prepopulateIfNeeded()
             _isInitialized.value = true
+            // Periodically sync cloud catalog in background
+            try {
+                repository.syncWithCloud()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun syncCloudCatalog() {
+        viewModelScope.launch {
+            try {
+                repository.syncWithCloud()
+            } catch (_: Exception) {}
         }
     }
 

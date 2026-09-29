@@ -34,7 +34,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "primeplex_database"
                 )
-                .fallbackToDestructiveMigration(true)
                 .build()
                 INSTANCE = instance
                 instance

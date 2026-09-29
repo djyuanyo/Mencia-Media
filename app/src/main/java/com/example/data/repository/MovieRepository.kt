@@ -5,8 +5,11 @@ import com.example.data.model.Movie
 import com.example.data.model.PlaybackProgress
 import com.example.data.model.Profile
 import com.example.data.model.Watchlist
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MovieRepository(private val movieDao: MovieDao) {
 
@@ -20,7 +23,41 @@ class MovieRepository(private val movieDao: MovieDao) {
     suspend fun deleteProfile(profile: Profile) = movieDao.deleteProfile(profile)
     suspend fun getProfileById(id: Int): Profile? = movieDao.getProfileById(id)
 
-    suspend fun insertMovie(movie: Movie): Long = movieDao.insertMovie(movie)
+    suspend fun insertMovie(movie: Movie): Long {
+        val id = movieDao.insertMovie(movie)
+        // Automatically publish to shared cloud catalog so all other users and devices see it
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CloudCatalogService.publishMovieToCloud(movie)
+            } catch (_: Exception) {}
+        }
+        return id
+    }
+
+    suspend fun syncWithCloud(): Int {
+        return try {
+            val cloudMovies = CloudCatalogService.fetchGlobalCatalog()
+            if (cloudMovies.isEmpty()) return 0
+            var addedCount = 0
+            val localMovies = allMovies.first()
+            for (remoteMovie in cloudMovies) {
+                val existing = localMovies.find {
+                    it.title.equals(remoteMovie.title, ignoreCase = true) &&
+                            (it.year == remoteMovie.year || it.videoUrl == remoteMovie.videoUrl)
+                }
+                if (existing == null) {
+                    movieDao.insertMovie(remoteMovie)
+                    addedCount++
+                } else if (existing.videoUrl.isBlank() && remoteMovie.videoUrl.isNotBlank()) {
+                    movieDao.insertMovie(existing.copy(videoUrl = remoteMovie.videoUrl))
+                    addedCount++
+                }
+            }
+            addedCount
+        } catch (_: Exception) {
+            0
+        }
+    }
     suspend fun deleteMovie(movie: Movie) = movieDao.deleteMovie(movie)
 
     fun getWatchlistForProfile(profileId: Int): Flow<List<Movie>> = movieDao.getWatchlistForProfile(profileId)
@@ -60,6 +97,11 @@ class MovieRepository(private val movieDao: MovieDao) {
             movieDao.insertProfile(Profile(name = "Invitado", avatarColorIndex = 2, isKid = false))
             movieDao.insertProfile(Profile(name = "Niños", avatarColorIndex = 3, isKid = true))
         }
+
+        // 1. Synchronize with global cloud catalog to fetch titles published by any user/admin
+        try {
+            syncWithCloud()
+        } catch (_: Exception) {}
 
         val existingMovies = allMovies.first()
         if (existingMovies.isEmpty()) {
