@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Profile
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 // Avatar color palette for custom profiles (Prime-style bright accent tones)
@@ -90,9 +91,9 @@ fun ProfileSelectionScreen(
                 modifier = Modifier.padding(bottom = 32.dp).testTag("profile_screen_title")
             )
 
-            // Grid Layout of Profiles
+            // Grid Layout of Profiles (Adaptive for TV wide screens and Mobile)
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Adaptive(minSize = 130.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier
@@ -102,11 +103,23 @@ fun ProfileSelectionScreen(
                 // List existing profiles
                 items(profiles) { profile ->
                     val color = AvatarColors.getOrElse(profile.avatarColorIndex) { AvatarColors[0] }
+                    val itemInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .testTag("profile_item_${profile.name}")
-                            .clickable {
+                            .padding(4.dp)
+                            .tvFocusable(
+                                shape = RoundedCornerShape(16.dp),
+                                focusedBorderColor = Color(0xFF00A8E1),
+                                focusedScale = 1.1f,
+                                interactionSource = itemInteractionSource
+                            )
+                            .padding(8.dp)
+                            .clickable(
+                                interactionSource = itemInteractionSource,
+                                indication = null
+                            ) {
                                 if (isEditMode) {
                                     // Remove profile in edit mode if clicked
                                     viewModel.deleteProfile(profile)
@@ -191,11 +204,23 @@ fun ProfileSelectionScreen(
                 // Plus option grid element to add new profiles (maximum of 6 profiles)
                 if (profiles.size < 6) {
                     item {
+                        val addInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .testTag("add_profile_card")
-                                .clickable {
+                                .padding(4.dp)
+                                .tvFocusable(
+                                    shape = RoundedCornerShape(16.dp),
+                                    focusedBorderColor = Color(0xFF00A8E1),
+                                    focusedScale = 1.1f,
+                                    interactionSource = addInteractionSource
+                                )
+                                .padding(8.dp)
+                                .clickable(
+                                    interactionSource = addInteractionSource,
+                                    indication = null
+                                ) {
                                     newProfileName = ""
                                     selectedColorIndex = profiles.size % AvatarColors.size
                                     isKidProfile = false
@@ -241,6 +266,11 @@ fun ProfileSelectionScreen(
                 modifier = Modifier
                     .fillMaxWidth(0.6f)
                     .height(48.dp)
+                    .tvFocusable(
+                        shape = RoundedCornerShape(8.dp),
+                        focusedBorderColor = Color(0xFF00A8E1),
+                        focusedScale = 1.05f
+                    )
                     .testTag("edit_profiles_toggle_button")
             ) {
                 Icon(

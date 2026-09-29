@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.EpisodeData
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -327,6 +328,7 @@ fun AddMovieScreen(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .height(56.dp)
+                                .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
                                 .testTag("plex_search_button")
                         ) {
                             if (isSearchingMetadata) {
@@ -367,13 +369,23 @@ fun AddMovieScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 items(suggestions) { item ->
+                                    val suggestionInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A)),
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier
                                             .width(240.dp)
                                             .border(1.dp, Color(0xFF00A8E1).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                            .clickable {
+                                            .tvFocusable(
+                                                shape = RoundedCornerShape(8.dp),
+                                                focusedBorderColor = Color(0xFF00A8E1),
+                                                focusedScale = 1.06f,
+                                                interactionSource = suggestionInteraction
+                                            )
+                                            .clickable(
+                                                interactionSource = suggestionInteraction,
+                                                indication = null
+                                            ) {
                                                 title = item.title
                                                 description = item.description
                                                 if (item.posterUrl.isNotEmpty()) posterUrl = item.posterUrl
@@ -1051,6 +1063,7 @@ fun AddMovieScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
+                    .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.05f)
                     .testTag("submit_movie_button")
             ) {
                 Text("Guardar en mi Biblioteca", fontSize = 15.sp, fontWeight = FontWeight.Bold)

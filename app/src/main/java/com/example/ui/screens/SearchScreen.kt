@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 @Composable
@@ -65,13 +66,13 @@ fun SearchScreen(
             .padding(16.dp)
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Adaptive(minSize = 160.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             // Header search controls
-            item(span = { GridItemSpan(2) }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Column {
                     OutlinedTextField(
                         value = query,
@@ -108,13 +109,23 @@ fun SearchScreen(
                     ) {
                         genreFilters.forEach { genre ->
                             val isSelected = selectedGenreFilter == genre
+                            val chipInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
+                                    .tvFocusable(
+                                        shape = RoundedCornerShape(16.dp),
+                                        focusedBorderColor = Color.White,
+                                        focusedScale = 1.08f,
+                                        interactionSource = chipInteraction
+                                    )
                                     .background(
                                         color = if (isSelected) Color(0xFF00A8E1) else Color(0xFF1E2E4A),
                                         shape = RoundedCornerShape(16.dp)
                                     )
-                                    .clickable { selectedGenreFilter = genre }
+                                    .clickable(
+                                        interactionSource = chipInteraction,
+                                        indication = null
+                                    ) { selectedGenreFilter = genre }
                                     .padding(horizontal = 14.dp, vertical = 6.dp)
                                     .testTag("genre_filter_$genre")
                             ) {
@@ -140,7 +151,7 @@ fun SearchScreen(
 
             // Results lists
             if (filteredMovies.isEmpty()) {
-                item(span = { GridItemSpan(2) }) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -172,11 +183,21 @@ fun SearchScreen(
                 }
             } else {
                 items(filteredMovies) { movie ->
+                    val cardInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(150.dp)
-                            .clickable { onNavigateToDetail(movie.id) },
+                            .tvFocusable(
+                                shape = RoundedCornerShape(8.dp),
+                                focusedBorderColor = Color(0xFF00A8E1),
+                                focusedScale = 1.08f,
+                                interactionSource = cardInteraction
+                            )
+                            .clickable(
+                                interactionSource = cardInteraction,
+                                indication = null
+                            ) { onNavigateToDetail(movie.id) },
                         shape = RoundedCornerShape(8.dp),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36))
                     ) {

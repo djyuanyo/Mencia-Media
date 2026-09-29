@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 @Composable
@@ -95,7 +96,9 @@ fun MyStuffScreen(
 
                         IconButton(
                             onClick = onLogoutProfile,
-                            modifier = Modifier.testTag("logout_profile_button")
+                            modifier = Modifier
+                                .tvFocusable(shape = RoundedCornerShape(20.dp), focusedScale = 1.15f)
+                                .testTag("logout_profile_button")
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ExitToApp,

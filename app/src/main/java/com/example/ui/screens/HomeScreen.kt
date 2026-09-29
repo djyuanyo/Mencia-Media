@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Movie
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 @Composable
@@ -99,11 +100,21 @@ fun HomeScreen(
                 ) {
                     formatFilters.forEach { filterName ->
                         val isSelected = selectedFormatFilter == filterName
+                        val chipInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = if (isSelected) Color(0xFF00A8E1) else Color(0xFF1E2E4A),
                             modifier = Modifier
-                                .clickable { selectedFormatFilter = filterName }
+                                .tvFocusable(
+                                    shape = RoundedCornerShape(16.dp),
+                                    focusedBorderColor = Color.White,
+                                    focusedScale = 1.08f,
+                                    interactionSource = chipInteractionSource
+                                )
+                                .clickable(
+                                    interactionSource = chipInteractionSource,
+                                    indication = null
+                                ) { selectedFormatFilter = filterName }
                                 .testTag("home_filter_$filterName")
                         ) {
                             Text(
@@ -248,8 +259,15 @@ fun HomeScreen(
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (hasVideo) Color(0xFF1A94FF) else Color(0xFF27354A)
                                     ),
-                                    shape = RoundedCornerShape(4.dp),
-                                    modifier = Modifier.height(36.dp)
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier
+                                        .height(40.dp)
+                                        .tvFocusable(
+                                            shape = RoundedCornerShape(6.dp),
+                                            focusedBorderColor = Color.White,
+                                            focusedScale = 1.06f
+                                        )
+                                        .testTag("hero_play_button")
                                 ) {
                                     Icon(
                                         if (hasVideo) Icons.Default.PlayArrow else Icons.Default.Info,
@@ -269,8 +287,14 @@ fun HomeScreen(
                                 IconButton(
                                     onClick = { onNavigateToDetail(movie.id) },
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .background(Color.White.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp))
+                                        .size(40.dp)
+                                        .tvFocusable(
+                                            shape = RoundedCornerShape(6.dp),
+                                            focusedBorderColor = Color(0xFF00A8E1),
+                                            focusedScale = 1.08f
+                                        )
+                                        .background(Color.White.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp))
+                                        .testTag("hero_details_button")
                                 ) {
                                     Icon(Icons.Default.Info, contentDescription = "Detalles", tint = Color.White, modifier = Modifier.size(18.dp))
                                 }
@@ -456,13 +480,23 @@ fun LandscapeMovieCard(
     movie: Movie,
     onClick: (Int) -> Unit
 ) {
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Card(
         modifier = Modifier
-            .width(160.dp)
-            .height(100.dp)
+            .width(170.dp)
+            .height(106.dp)
             .testTag("movie_card_${movie.id}")
-            .clickable { onClick(movie.id) },
-        shape = RoundedCornerShape(6.dp),
+            .tvFocusable(
+                shape = RoundedCornerShape(8.dp),
+                focusedBorderColor = Color(0xFF00A8E1),
+                focusedScale = 1.08f,
+                interactionSource = interactionSource
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick(movie.id) },
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -558,12 +592,22 @@ fun ContinueWatchingCard(
     onDetailClick: (Int) -> Unit,
     onPlayClick: (Int) -> Unit
 ) {
+    val cardInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Card(
         modifier = Modifier
-            .width(180.dp)
-            .height(125.dp)
-            .clickable { onDetailClick(movie.id) },
-        shape = RoundedCornerShape(6.dp),
+            .width(190.dp)
+            .height(130.dp)
+            .tvFocusable(
+                shape = RoundedCornerShape(8.dp),
+                focusedBorderColor = Color(0xFF00A8E1),
+                focusedScale = 1.08f,
+                interactionSource = cardInteractionSource
+            )
+            .clickable(
+                interactionSource = cardInteractionSource,
+                indication = null
+            ) { onDetailClick(movie.id) },
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1F2E4A))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

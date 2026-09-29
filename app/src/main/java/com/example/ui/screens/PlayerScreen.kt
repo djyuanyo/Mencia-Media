@@ -45,6 +45,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
+import com.example.ui.components.tvFocusable
+import com.example.util.DeviceUtils
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
@@ -56,13 +64,18 @@ fun PlayerScreen(
     val movieState = viewModel.allMovies.collectAsState().value
     val movie = movieState.find { it.id == movieId }
 
-    // Lock orientation to Landscape for cinematic viewing
+    // Lock orientation to Landscape for cinematic viewing on phone; on TV keep system landscape
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        val previousOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = previousOrientation
+        val isTv = DeviceUtils.isTv(context)
+        if (!isTv) {
+            val previousOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            onDispose {
+                activity?.requestedOrientation = previousOrientation
+            }
+        } else {
+            onDispose { }
         }
     }
 
@@ -178,11 +191,33 @@ private fun GoogleDriveWebPlayer(
         }
     }
 
+    val driveFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        driveFocusRequester.requestFocus()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .testTag("google_drive_player_container")
+            .focusRequester(driveFocusRequester)
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_DPAD_UP,
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            showOverlayControls = !showOverlayControls
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -282,7 +317,10 @@ private fun GoogleDriveWebPlayer(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.size(36.dp).testTag("drive_player_back_button")
+                        modifier = Modifier
+                            .size(38.dp)
+                            .tvFocusable(shape = RoundedCornerShape(19.dp), focusedScale = 1.15f)
+                            .testTag("drive_player_back_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -336,7 +374,10 @@ private fun GoogleDriveWebPlayer(
                         },
                         shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.height(34.dp).padding(end = 8.dp)
+                        modifier = Modifier
+                            .height(34.dp)
+                            .padding(end = 8.dp)
+                            .tvFocusable(shape = RoundedCornerShape(6.dp), focusedScale = 1.06f)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -346,7 +387,9 @@ private fun GoogleDriveWebPlayer(
                     // Refresh stream button
                     IconButton(
                         onClick = { webViewRef?.reload() },
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .tvFocusable(shape = RoundedCornerShape(18.dp), focusedScale = 1.15f)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = "Recargar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
                     }
@@ -402,11 +445,82 @@ private fun NativeVideoPlayer(
         }
     }
 
+    val playerFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        playerFocusRequester.requestFocus()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag("video_player_container")
             .background(Color.Black)
+            .focusRequester(playerFocusRequester)
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                            videoViewRef?.let {
+                                if (isPlaying) {
+                                    it.pause()
+                                    isPlaying = false
+                                } else {
+                                    it.start()
+                                    isPlaying = true
+                                }
+                                showControls = true
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
+                            videoViewRef?.let {
+                                it.start()
+                                isPlaying = true
+                                showControls = true
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                            videoViewRef?.let {
+                                it.pause()
+                                isPlaying = false
+                                showControls = true
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                        AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                            videoViewRef?.let {
+                                val target = (it.currentPosition - 10000).coerceAtLeast(0)
+                                it.seekTo(target)
+                                currentPos = target.toLong()
+                                showControls = true
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                        AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                            videoViewRef?.let {
+                                val target = (it.currentPosition + 10000).coerceAtMost(duration.toInt())
+                                it.seekTo(target)
+                                currentPos = target.toLong()
+                                showControls = true
+                            }
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_UP,
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            showControls = !showControls
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -505,14 +619,22 @@ private fun NativeVideoPlayer(
                     ) {
                         Button(
                             onClick = onNavigateBack,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
                         ) {
                             Text("Volver", color = Color.White)
                         }
 
                         Button(
                             onClick = onSwitchToWebPlayer,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF))
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.tvFocusable(
+                                shape = RoundedCornerShape(8.dp),
+                                focusedBorderColor = Color.White,
+                                focusedScale = 1.06f
+                            )
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -524,7 +646,9 @@ private fun NativeVideoPlayer(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(movie.videoUrl))
                                 context.startActivity(intent)
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
                         ) {
                             Text("Abrir Externamente")
                         }
@@ -556,7 +680,10 @@ private fun NativeVideoPlayer(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = onNavigateBack,
-                            modifier = Modifier.testTag("video_back_button")
+                            modifier = Modifier
+                                .size(40.dp)
+                                .tvFocusable(shape = RoundedCornerShape(20.dp), focusedScale = 1.15f)
+                                .testTag("video_back_button")
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -584,7 +711,10 @@ private fun NativeVideoPlayer(
                     }
 
                     if (isGoogleDriveUrl(movie.videoUrl)) {
-                        TextButton(onClick = onSwitchToWebPlayer) {
+                        TextButton(
+                            onClick = onSwitchToWebPlayer,
+                            modifier = Modifier.tvFocusable(shape = RoundedCornerShape(6.dp), focusedScale = 1.05f)
+                        ) {
                             Text("Modo Drive Web", color = Color(0xFF00A8E1), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -604,7 +734,9 @@ private fun NativeVideoPlayer(
                                 currentPos = target.toLong()
                             }
                         },
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .tvFocusable(shape = RoundedCornerShape(24.dp), focusedScale = 1.15f)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = "Retroceder 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }
@@ -624,6 +756,11 @@ private fun NativeVideoPlayer(
                         modifier = Modifier
                             .size(64.dp)
                             .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(32.dp))
+                            .tvFocusable(
+                                shape = RoundedCornerShape(32.dp),
+                                focusedScale = 1.15f,
+                                focusedBorderColor = Color.White
+                            )
                             .testTag("play_pause_button")
                     ) {
                         Icon(
@@ -642,7 +779,9 @@ private fun NativeVideoPlayer(
                                 currentPos = target.toLong()
                             }
                         },
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier
+                            .size(48.dp)
+                            .tvFocusable(shape = RoundedCornerShape(24.dp), focusedScale = 1.15f)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Avanzar 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }

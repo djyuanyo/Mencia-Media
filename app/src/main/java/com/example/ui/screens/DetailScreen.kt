@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.ui.components.ImdbScoreCard
+import com.example.ui.components.tvFocusable
 import com.example.ui.viewmodel.MovieViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +68,12 @@ fun DetailScreen(
             TopAppBar(
                 title = { Text(movie.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack, modifier = Modifier.testTag("detail_back_button")) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .tvFocusable(shape = RoundedCornerShape(24.dp), focusedScale = 1.1f)
+                            .testTag("detail_back_button")
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
                     }
                 },
@@ -212,6 +218,11 @@ fun DetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
+                        .tvFocusable(
+                            shape = RoundedCornerShape(8.dp),
+                            focusedBorderColor = Color.White,
+                            focusedScale = 1.04f
+                        )
                         .testTag("play_movie_button")
                 ) {
                     Icon(
@@ -278,6 +289,11 @@ fun DetailScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
+                            .tvFocusable(
+                                shape = RoundedCornerShape(8.dp),
+                                focusedBorderColor = Color(0xFF00A8E1),
+                                focusedScale = 1.05f
+                            )
                             .testTag("toggle_watchlist_button")
                     ) {
                         Icon(
@@ -309,6 +325,11 @@ fun DetailScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
+                                .tvFocusable(
+                                    shape = RoundedCornerShape(8.dp),
+                                    focusedBorderColor = Color(0xFFF5C518),
+                                    focusedScale = 1.05f
+                                )
                         ) {
                             Text(
                                 "IMDb Ficha",
