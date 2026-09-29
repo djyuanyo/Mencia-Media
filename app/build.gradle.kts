@@ -117,5 +117,5 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
+  // libs.moshi.kotlin.codegen is commented out to avoid KSP2 IntelliJ ApplicationManager AWT crashes on CI
 }
