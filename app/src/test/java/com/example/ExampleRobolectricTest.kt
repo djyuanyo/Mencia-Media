@@ -79,4 +79,57 @@ class ExampleRobolectricTest {
     assertEquals(1, restored[0].episodeNumber)
     assertEquals("Capítulo 2", restored[1].title)
   }
+
+  @Test
+  fun testAddMovieAndSeriesWithoutVideoUrlAppearsInCatalog() = runTest {
+    // 1. Initial database population
+    repository.prepopulateIfNeeded()
+    val initialCount = repository.allMovies.first().size
+
+    // 2. Add movie without video link (videoUrl is empty)
+    viewModel.addMovie(
+      title = "Dune: Parte Dos",
+      description = "Paul Atreides se une a Chani y a los Fremen.",
+      videoUrl = "",
+      posterUrl = "https://image.tmdb.org/t/p/w500/dune.jpg",
+      category = "Películas",
+      genre = "Sci-Fi",
+      year = "2024",
+      duration = "166 min",
+      isFeatured = false,
+      cast = "Timothée Chalamet, Zendaya",
+      imdbRating = "8.6",
+      imdbId = "tt15239678"
+    )
+
+    // 3. Add series without video link
+    viewModel.addMovie(
+      title = "Breaking Bad",
+      description = "Un profesor de química diagnosticado con cáncer.",
+      videoUrl = "",
+      posterUrl = "https://image.tmdb.org/t/p/w500/bb.jpg",
+      category = "Series",
+      genre = "Drama",
+      year = "2008",
+      duration = "5 temporadas",
+      isFeatured = false,
+      cast = "Bryan Cranston, Aaron Paul",
+      imdbRating = "9.5",
+      imdbId = "tt0903747"
+    )
+
+    // 4. Verify catalog now contains both new items even without videoUrl
+    val updatedMovies = repository.allMovies.first()
+    assertEquals(initialCount + 2, updatedMovies.size)
+
+    val dune = updatedMovies.firstOrNull { it.title == "Dune: Parte Dos" }
+    assertNotNull(dune)
+    assertEquals("", dune?.videoUrl)
+    assertEquals("8.6", dune?.imdbRating)
+
+    val bb = updatedMovies.firstOrNull { it.title == "Breaking Bad" }
+    assertNotNull(bb)
+    assertEquals("Series", bb?.category)
+    assertEquals("", bb?.videoUrl)
+  }
 }

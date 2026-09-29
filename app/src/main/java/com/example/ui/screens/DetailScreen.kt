@@ -187,12 +187,24 @@ fun DetailScreen(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
+                val hasVideo = movie.videoUrl.isNotBlank()
+
                 // Main "Reproducir" (Play) Button
                 Button(
-                    onClick = { onNavigateToPlayer(movie.id) },
+                    onClick = {
+                        if (hasVideo) {
+                            onNavigateToPlayer(movie.id)
+                        } else {
+                            android.widget.Toast.makeText(
+                                context,
+                                "No se puede reproducir: este título está guardado en tu biblioteca sin enlace de vídeo.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1A94FF), // Prime active blue
-                        contentColor = Color.White
+                        containerColor = if (hasVideo) Color(0xFF1A94FF) else Color(0xFF27354A), // Prime active blue or muted slate
+                        contentColor = if (hasVideo) Color.White else Color.LightGray
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
@@ -201,15 +213,39 @@ fun DetailScreen(
                         .testTag("play_movie_button")
                 ) {
                     Icon(
-                        if (savedProgress > 0) Icons.Default.Refresh else Icons.Default.PlayArrow,
+                        if (!hasVideo) Icons.Default.Info else if (savedProgress > 0) Icons.Default.Refresh else Icons.Default.PlayArrow,
                         contentDescription = "Reproducir"
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (savedProgress > 0) "Reanudar contenido" else "Reproducir ahora",
-                        fontSize = 16.sp,
+                        text = if (!hasVideo) "Sin enlace de reproducción disponible" else if (savedProgress > 0) "Reanudar contenido" else "Reproducir ahora",
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                if (!hasVideo) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A).copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Ficha catalogada sin enlace de vídeo. Puedes consultar su sinopsis, reparto y episodios, pero no se puede reproducir.",
+                                color = Color.LightGray,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
                 }
 
                 // Saved progress bar indicator
@@ -445,7 +481,17 @@ fun DetailScreen(
                                             color = Color(0xFF1E2E4A),
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clickable { onNavigateToPlayer(movie.id) }
+                                                .clickable {
+                                                    if (hasVideo) {
+                                                        onNavigateToPlayer(movie.id)
+                                                    } else {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "Esta serie está en tu biblioteca sin enlace de vídeo para reproducir episodios.",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
                                         ) {
                                             Row(
                                                 modifier = Modifier.padding(12.dp),

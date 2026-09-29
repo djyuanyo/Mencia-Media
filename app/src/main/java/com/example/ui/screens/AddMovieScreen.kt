@@ -34,7 +34,8 @@ import com.example.ui.viewmodel.MovieViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMovieScreen(
-    viewModel: MovieViewModel
+    viewModel: MovieViewModel,
+    onMovieSaved: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
@@ -547,7 +548,7 @@ fun AddMovieScreen(
                 }
             }
 
-            // 2. VIDEO STREAM LINK
+            // 2. VIDEO STREAM LINK (OPCIONAL)
             OutlinedTextField(
                 value = videoUrl,
                 onValueChange = { newUrl ->
@@ -560,8 +561,8 @@ fun AddMovieScreen(
                         }
                     }
                 },
-                label = { Text("Enlace de Google Drive / WordPress (mp4)", color = Color.Gray) },
-                placeholder = { Text("https://drive.google.com/file/d/...", color = Color.DarkGray) },
+                label = { Text("Enlace de Vídeo / Streaming (Opcional)", color = Color.Gray) },
+                placeholder = { Text("https://... (Opcional: puedes guardar sin enlace)", color = Color.DarkGray) },
                 leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color.Gray) },
                 trailingIcon = {
                     if (videoUrl.isNotEmpty()) {
@@ -591,9 +592,10 @@ fun AddMovieScreen(
             )
 
             Text(
-                "Acepta enlaces públicos de Google Drive o enlaces multimedia directos de WordPress.",
-                color = Color.Gray,
+                "Opcional. Acepta enlaces directos de Google Drive o WordPress. Si no tienes enlace, guárdalo igualmente: aparecerá en tu biblioteca y página de inicio con todos sus datos.",
+                color = Color.LightGray,
                 fontSize = 11.sp,
+                lineHeight = 16.sp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp, start = 4.dp)
@@ -954,8 +956,8 @@ fun AddMovieScreen(
             // SUBMIT BUTTON
             Button(
                 onClick = {
-                    if (title.trim().isEmpty() || videoUrl.trim().isEmpty()) {
-                        Toast.makeText(context, "Por favor complete Título y Enlace de Vídeo", Toast.LENGTH_SHORT).show()
+                    if (title.trim().isEmpty()) {
+                        Toast.makeText(context, "Por favor escribe al menos el título de la película o serie", Toast.LENGTH_SHORT).show()
                     } else {
                         val episodesJson = if (episodesList.isNotEmpty()) {
                             EpisodeData.listToJson(episodesList)
@@ -969,7 +971,7 @@ fun AddMovieScreen(
                             category = category,
                             genre = genre,
                             year = year.ifEmpty { "2026" },
-                            duration = duration.ifEmpty { "120 min" },
+                            duration = duration.ifEmpty { if (category == "Series") "${episodesList.size.coerceAtLeast(1)} eps" else "120 min" },
                             isFeatured = isFeatured,
                             cast = cast.trim(),
                             imdbRating = imdbRating.trim(),
@@ -978,7 +980,7 @@ fun AddMovieScreen(
                             episodesJson = episodesJson,
                             metadataSource = metadataSource.ifEmpty { "TMDB + IMDb + TheTVDB" }
                         )
-                        Toast.makeText(context, "¡Medio añadido con éxito a la biblioteca!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "¡\"${title.trim()}\" guardado con éxito en tu biblioteca!", Toast.LENGTH_SHORT).show()
 
                         // Reset forms
                         title = ""
@@ -992,6 +994,8 @@ fun AddMovieScreen(
                         episodesList = emptyList()
                         isFeatured = false
                         appliedSourceNotice = null
+
+                        onMovieSaved()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(

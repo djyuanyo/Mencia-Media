@@ -194,7 +194,8 @@ fun MainHubScreen(
                 }
                 MainTab.SUBIR -> {
                     AddMovieScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onMovieSaved = { activeTab = MainTab.INICIO }
                     )
                 }
                 MainTab.MI_ESPACIO -> {

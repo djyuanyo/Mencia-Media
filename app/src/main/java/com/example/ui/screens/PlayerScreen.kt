@@ -65,7 +65,52 @@ fun PlayerScreen(
                 .background(Color(0xFF09111E)),
             contentAlignment = Alignment.Center
         ) {
-            Text("Pelicula no encontrada", color = Color.White)
+            Text("Película no encontrada", color = Color.White)
+        }
+        return
+    }
+
+    if (movie.videoUrl.isBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF09111E))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = Color(0xFF00A8E1),
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Sin enlace de reproducción",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "\"${movie.title}\" está guardada en tu biblioteca con todos sus metadatos oficiales, pero no cuenta con un enlace de vídeo para reproducir.",
+                    color = Color.LightGray,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = onNavigateBack,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1))
+                ) {
+                    Text("Regresar a la biblioteca", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
         }
         return
     }

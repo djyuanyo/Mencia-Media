@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,13 +33,17 @@ fun HomeScreen(
     onNavigateToDetail: (Int) -> Unit,
     onNavigateToPlayer: (Int) -> Unit
 ) {
+    val context = LocalContext.current
     val activeProfile by viewModel.currentProfile.collectAsState()
     val allMovies by viewModel.allMovies.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
     val continueWatching by viewModel.continueWatching.collectAsState()
 
+    var selectedFormatFilter by remember { mutableStateOf("Todo") }
+    val formatFilters = listOf("Todo", "Películas", "Series")
+
     // Filter contents dynamically if user is a children profile
-    val displayedMovies = remember(allMovies, activeProfile) {
+    val baseMovies = remember(allMovies, activeProfile) {
         if (activeProfile?.isKid == true) {
             allMovies.filter { it.genre.lowercase() in listOf("comedia", "fantasía") }
         } else {
@@ -45,9 +51,28 @@ fun HomeScreen(
         }
     }
 
+    // Filter by format tab (Todo / Películas / Series)
+    val displayedMovies = remember(baseMovies, selectedFormatFilter) {
+        when (selectedFormatFilter) {
+            "Películas" -> baseMovies.filter { it.category.equals("Películas", ignoreCase = true) }
+            "Series" -> baseMovies.filter { it.category.equals("Series", ignoreCase = true) }
+            else -> baseMovies
+        }
+    }
+
     // Hero image selection
     val featuredMovie = remember(displayedMovies) {
         displayedMovies.firstOrNull { it.isFeatured } ?: displayedMovies.firstOrNull()
+    }
+
+    // Recently added items sorted by newest addedAt
+    val recentlyAdded = remember(displayedMovies) {
+        displayedMovies.sortedByDescending { it.addedAt }
+    }
+
+    // Series items
+    val seriesList = remember(displayedMovies) {
+        displayedMovies.filter { it.category.equals("Series", ignoreCase = true) }
     }
 
     val genres = remember(displayedMovies) {
@@ -64,9 +89,39 @@ fun HomeScreen(
                 .fillMaxSize()
                 .testTag("home_screen_column")
         ) {
+            // FORMAT FILTER PILLS (Todo / Películas / Series)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    formatFilters.forEach { filterName ->
+                        val isSelected = selectedFormatFilter == filterName
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) Color(0xFF00A8E1) else Color(0xFF1E2E4A),
+                            modifier = Modifier
+                                .clickable { selectedFormatFilter = filterName }
+                                .testTag("home_filter_$filterName")
+                        ) {
+                            Text(
+                                text = filterName,
+                                color = if (isSelected) Color.Black else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // 1. HERO HEADER (Prime Video Widescreen Featured Banner)
             featuredMovie?.let { movie ->
                 item {
+                    val hasVideo = movie.videoUrl.isNotBlank()
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -102,13 +157,29 @@ fun HomeScreen(
                                 .padding(20.dp)
                                 .fillMaxWidth()
                         ) {
-                            Text(
-                                text = "DESTAQUE HOY",
-                                color = Color(0xFF00A8E1),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (movie.category == "Series") "SERIE DESTACADA" else "DESTAQUE HOY",
+                                    color = Color(0xFF00A8E1),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (!hasVideo) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFF334155).copy(alpha = 0.8f)
+                                    ) {
+                                        Text(
+                                            text = "FICHA / SIN ENLACE",
+                                            color = Color.LightGray,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
 
                             Text(
                                 text = movie.title,
@@ -117,7 +188,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                             )
 
                             Text(
@@ -134,14 +205,35 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Button(
-                                    onClick = { onNavigateToPlayer(movie.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF)),
+                                    onClick = {
+                                        if (hasVideo) {
+                                            onNavigateToPlayer(movie.id)
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Este contenido no tiene enlace de vídeo para reproducir.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            onNavigateToDetail(movie.id)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (hasVideo) Color(0xFF1A94FF) else Color(0xFF27354A)
+                                    ),
                                     shape = RoundedCornerShape(4.dp),
                                     modifier = Modifier.height(36.dp)
                                 ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        if (hasVideo) Icons.Default.PlayArrow else Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Ver ahora", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (hasVideo) "Ver ahora" else "Ver ficha",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -160,7 +252,90 @@ fun HomeScreen(
                 }
             }
 
-            // 2. CONTINUE WATCHING (Seguir viendo)
+            // 2. RECIENTEMENTE AÑADIDOS (Novedades en tu Biblioteca)
+            // Displays all items sorted by addedAt descending so newly saved titles appear first!
+            if (recentlyAdded.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Añadidos recientemente",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF00A8E1).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "Novedades",
+                                    color = Color(0xFF00A8E1),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(recentlyAdded) { movie ->
+                                LandscapeMovieCard(movie, onNavigateToDetail)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. SERIES DE TELEVISIÓN (Dedicated row for series when in Todo or Series filter)
+            if (seriesList.isNotEmpty() && selectedFormatFilter != "Películas") {
+                item {
+                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Series de televisión",
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF2BAD3B).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "${seriesList.size} series",
+                                    color = Color(0xFF2BAD3B),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(seriesList) { movie ->
+                                LandscapeMovieCard(movie, onNavigateToDetail)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. CONTINUE WATCHING (Seguir viendo)
             if (continueWatching.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -184,7 +359,7 @@ fun HomeScreen(
                 }
             }
 
-            // 3. WATCHLIST / LISTA DE SEGUIMIENTO (Mi Lista)
+            // 5. WATCHLIST / LISTA DE SEGUIMIENTO (Mi Lista)
             if (watchlist.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -208,14 +383,18 @@ fun HomeScreen(
                 }
             }
 
-            // 4. CATEGORIES BY GENRE
+            // 6. CATEGORIES BY GENRE
             genres.forEach { genre ->
                 val genreMovies = displayedMovies.filter { it.genre == genre }
                 if (genreMovies.isNotEmpty()) {
                     item {
                         Column(modifier = Modifier.padding(vertical = 12.dp)) {
                             Text(
-                                text = "Películas de $genre",
+                                text = when (selectedFormatFilter) {
+                                    "Series" -> "Series de $genre"
+                                    "Películas" -> "Películas de $genre"
+                                    else -> "Títulos de $genre"
+                                },
                                 color = Color.White,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
@@ -279,6 +458,37 @@ fun LandscapeMovieCard(
                         )
                     )
             )
+
+            // Badge indicating Ficha / Sin Enlace if videoUrl is blank, or Serie tag
+            if (movie.videoUrl.isBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 4.dp),
+                    color = Color(0xFF00A8E1),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = "Ficha",
+                        color = Color.Black,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            } else if (movie.category == "Series") {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 4.dp),
+                    color = Color(0xFF2BAD3B),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = "Serie",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
 
             // IMDb Rating Badge
             if (movie.imdbRating.isNotBlank()) {
