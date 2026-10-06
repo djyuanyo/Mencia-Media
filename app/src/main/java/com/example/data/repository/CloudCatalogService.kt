@@ -156,4 +156,70 @@ object CloudCatalogService {
             return@withContext false
         }
     }
+
+    /**
+     * Permanently deletes a movie or series from the shared cloud catalog,
+     * ensuring it never re-appears when closing and reopening the application.
+     */
+    suspend fun deleteMovieFromCloud(title: String, year: String = "", videoUrl: String = ""): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val currentList = fetchGlobalCatalog().toMutableList()
+            val beforeCount = currentList.size
+
+            val trimmedTitle = title.trim()
+            currentList.removeAll { m ->
+                val titleMatch = m.title.trim().equals(trimmedTitle, ignoreCase = true)
+                val yearMatch = year.isBlank() || m.year.trim() == year.trim()
+                val urlMatch = videoUrl.isBlank() || m.videoUrl.trim() == videoUrl.trim()
+                titleMatch && (yearMatch || urlMatch || year.isBlank())
+            }
+
+            if (currentList.size == beforeCount) {
+                Log.d(TAG, "Movie '$title' was not present in cloud catalog.")
+                return@withContext true
+            }
+
+            val catalogArray = JSONArray()
+            for (m in currentList) {
+                val itemObj = JSONObject().apply {
+                    put("title", m.title)
+                    put("description", m.description)
+                    put("videoUrl", m.videoUrl)
+                    put("posterUrl", m.posterUrl)
+                    put("category", m.category)
+                    put("genre", m.genre)
+                    put("year", m.year)
+                    put("duration", m.duration)
+                    put("isFeatured", m.isFeatured)
+                    put("cast", m.cast)
+                    put("imdbRating", m.imdbRating)
+                    put("imdbId", m.imdbId)
+                    put("tmdbId", m.tmdbId)
+                    put("episodesJson", m.episodesJson)
+                    put("metadataSource", m.metadataSource)
+                }
+                catalogArray.put(itemObj)
+            }
+
+            val payloadObj = JSONObject().apply {
+                put("version", 1)
+                put("catalog", catalogArray)
+            }
+
+            val requestBody = payloadObj.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url(CLOUD_BIN_URL)
+                .put(requestBody)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val success = response.isSuccessful
+                Log.d(TAG, "Permanently deleted '$title' from cloud catalog. Success: $success")
+                return@withContext success
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting movie from cloud catalog: ${e.message}", e)
+            return@withContext false
+        }
+    }
 }

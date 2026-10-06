@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
 
         // Initialize SQLite Room Database & Repository Pattern
         val database = AppDatabase.getDatabase(applicationContext)
-        val repository = MovieRepository(database.movieDao())
+        val repository = MovieRepository(database.movieDao(), applicationContext)
         
         // Setup ViewModel Factory and initialize central State Engine
         val viewModelFactory = MovieViewModelFactory(repository)

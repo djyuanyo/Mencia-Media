@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import android.content.Context
 import com.example.data.local.MovieDao
 import com.example.data.model.Movie
 import com.example.data.model.PlaybackProgress
@@ -12,7 +13,36 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class MovieRepository(private val movieDao: MovieDao) {
+class MovieRepository(
+    private val movieDao: MovieDao,
+    private val context: Context? = null
+) {
+
+    private val prefs by lazy {
+        context?.getSharedPreferences("primeplex_catalog_prefs", Context.MODE_PRIVATE)
+    }
+
+    private fun markMovieAsDeleted(title: String, year: String) {
+        val key = "${title.trim().lowercase()}|${year.trim()}"
+        val current = prefs?.getStringSet("deleted_movies_keys", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(key)
+        prefs?.edit()?.putStringSet("deleted_movies_keys", current)?.apply()
+    }
+
+    private fun unmarkMovieAsDeleted(title: String, year: String) {
+        val key = "${title.trim().lowercase()}|${year.trim()}"
+        val keyPrefix = "${title.trim().lowercase()}|"
+        val current = prefs?.getStringSet("deleted_movies_keys", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.removeAll { it == key || it.startsWith(keyPrefix) }
+        prefs?.edit()?.putStringSet("deleted_movies_keys", current)?.apply()
+    }
+
+    fun isMovieMarkedDeleted(title: String, year: String): Boolean {
+        val key = "${title.trim().lowercase()}|${year.trim()}"
+        val keyPrefix = "${title.trim().lowercase()}|"
+        val deletedSet = prefs?.getStringSet("deleted_movies_keys", emptySet()) ?: emptySet()
+        return deletedSet.contains(key) || deletedSet.any { it.startsWith(keyPrefix) }
+    }
 
     val allProfiles: Flow<List<Profile>> = movieDao.getAllProfiles()
     val allMovies: Flow<List<Movie>> = movieDao.getAllMovies()
@@ -25,6 +55,7 @@ class MovieRepository(private val movieDao: MovieDao) {
     suspend fun getProfileById(id: Int): Profile? = movieDao.getProfileById(id)
 
     suspend fun insertMovie(movie: Movie): Long {
+        unmarkMovieAsDeleted(movie.title, movie.year)
         val id = movieDao.insertMovie(movie)
         // Automatically publish to shared cloud catalog so all other users and devices see it
         CoroutineScope(Dispatchers.IO).launch {
@@ -42,6 +73,14 @@ class MovieRepository(private val movieDao: MovieDao) {
             var addedCount = 0
             val localMovies = allMovies.first()
             for (remoteMovie in cloudMovies) {
+                // If this movie was deleted by the user, DO NOT RESTORE IT!
+                if (isMovieMarkedDeleted(remoteMovie.title, remoteMovie.year)) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        CloudCatalogService.deleteMovieFromCloud(remoteMovie.title, remoteMovie.year, remoteMovie.videoUrl)
+                    }
+                    continue
+                }
+
                 val existing = localMovies.find {
                     it.title.equals(remoteMovie.title, ignoreCase = true) &&
                             (it.year == remoteMovie.year || it.videoUrl == remoteMovie.videoUrl)
@@ -59,8 +98,37 @@ class MovieRepository(private val movieDao: MovieDao) {
             0
         }
     }
-    suspend fun deleteMovie(movie: Movie) = movieDao.deleteMovie(movie)
-    suspend fun updateMovie(movie: Movie) = movieDao.updateMovie(movie)
+
+    suspend fun deleteMovie(movie: Movie) {
+        // 1. Mark as permanently deleted in local persistent tombstone
+        markMovieAsDeleted(movie.title, movie.year)
+
+        // 2. Delete from local Room database
+        movieDao.deleteMovie(movie)
+
+        // 3. Clean up playback progress & watchlist
+        try {
+            movieDao.deletePlaybackProgressForMovie(movie.id)
+            movieDao.deleteWatchlistForMovie(movie.id)
+        } catch (_: Exception) {}
+
+        // 4. Delete from shared cloud bin permanently
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CloudCatalogService.deleteMovieFromCloud(movie.title, movie.year, movie.videoUrl)
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun updateMovie(movie: Movie) {
+        movieDao.updateMovie(movie)
+        // Sync updated movie to cloud bin
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CloudCatalogService.publishMovieToCloud(movie)
+            } catch (_: Exception) {}
+        }
+    }
 
     // --- USER ACCOUNTS & AUTHENTICATION ---
     val allUsers: Flow<List<UserAccount>> = movieDao.getAllUsers()
@@ -179,8 +247,9 @@ class MovieRepository(private val movieDao: MovieDao) {
             syncWithCloud()
         } catch (_: Exception) {}
 
+        val hasPrepopulatedSamples = prefs?.getBoolean("has_prepopulated_samples_v4", false) ?: false
         val existingMovies = allMovies.first()
-        if (existingMovies.isEmpty()) {
+        if (!hasPrepopulatedSamples && existingMovies.isEmpty()) {
             val sampleMovies = listOf(
                 Movie(
                     title = "Sintel",
@@ -265,8 +334,11 @@ class MovieRepository(private val movieDao: MovieDao) {
                 )
             )
             for (movie in sampleMovies) {
-                movieDao.insertMovie(movie)
+                if (!isMovieMarkedDeleted(movie.title, movie.year)) {
+                    movieDao.insertMovie(movie)
+                }
             }
+            prefs?.edit()?.putBoolean("has_prepopulated_samples_v4", true)?.apply()
         }
     }
 }

@@ -100,4 +100,10 @@ interface MovieDao {
 
     @Query("DELETE FROM playback_progress WHERE profileId = :profileId AND movieId = :movieId")
     suspend fun deletePlaybackProgress(profileId: Int, movieId: Int)
+
+    @Query("DELETE FROM playback_progress WHERE movieId = :movieId")
+    suspend fun deletePlaybackProgressForMovie(movieId: Int)
+
+    @Query("DELETE FROM watchlist WHERE movieId = :movieId")
+    suspend fun deleteWatchlistForMovie(movieId: Int)
 }
