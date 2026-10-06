@@ -25,7 +25,8 @@ data class MediaSuggestion(
     val imdbId: String = "", // e.g. "tt1375666"
     val tmdbId: String = "", // e.g. "27205"
     val episodes: List<EpisodeData> = emptyList(), // TheTVDB episode ordering
-    val awards: String = "" // e.g. "Ganadora de 4 Premios Oscar"
+    val awards: String = "", // e.g. "Ganadora de 4 Premios Oscar"
+    val trailerUrl: String = "" // YouTube trailer link
 )
 
 data class ImdbDetails(
@@ -154,9 +155,9 @@ class MetadataService {
 
                             try {
                                 val detailUrl = if (isTv) {
-                                    "https://api.themoviedb.org/3/tv/$id?api_key=$tmdbKey&language=es-ES&append_to_response=credits,external_ids"
+                                    "https://api.themoviedb.org/3/tv/$id?api_key=$tmdbKey&language=es-ES&append_to_response=credits,external_ids,videos"
                                 } else {
-                                    "https://api.themoviedb.org/3/movie/$id?api_key=$tmdbKey&language=es-ES&append_to_response=credits,external_ids"
+                                    "https://api.themoviedb.org/3/movie/$id?api_key=$tmdbKey&language=es-ES&append_to_response=credits,external_ids,videos"
                                 }
 
                                 val detailReq = Request.Builder().url(detailUrl).build()
@@ -172,6 +173,13 @@ class MetadataService {
                                                 genre = genresArray.getJSONObject(0).optString("name", genre)
                                             }
 
+                                            // Spanish Title preference
+                                            val detailTitle = if (isTv) {
+                                                detailJson.optString("name").ifEmpty { title }
+                                            } else {
+                                                detailJson.optString("title").ifEmpty { title }
+                                            }
+
                                             // Runtime
                                             if (!isTv) {
                                                 val runtime = detailJson.optInt("runtime", 120)
@@ -182,6 +190,59 @@ class MetadataService {
                                             val extIds = detailJson.optJSONObject("external_ids")
                                             if (extIds != null) {
                                                 imdbId = extIds.optString("imdb_id", "")
+                                            }
+
+                                            // Trailer extraction (YouTube)
+                                            var extractedTrailer = ""
+                                            val videosObj = detailJson.optJSONObject("videos")
+                                            val videoResults = videosObj?.optJSONArray("results")
+                                            if (videoResults != null && videoResults.length() > 0) {
+                                                for (vIdx in 0 until videoResults.length()) {
+                                                    val vItem = videoResults.getJSONObject(vIdx)
+                                                    val site = vItem.optString("site", "")
+                                                    val vType = vItem.optString("type", "")
+                                                    val key = vItem.optString("key", "")
+                                                    if (site.equals("YouTube", ignoreCase = true) && key.isNotBlank()) {
+                                                        if (vType.equals("Trailer", ignoreCase = true)) {
+                                                            extractedTrailer = "https://www.youtube.com/watch?v=$key"
+                                                            val vLang = vItem.optString("iso_639_1", "")
+                                                            if (vLang.equals("es", ignoreCase = true)) {
+                                                                break // Ideal Spanish trailer found
+                                                            }
+                                                        } else if (extractedTrailer.isBlank()) {
+                                                            extractedTrailer = "https://www.youtube.com/watch?v=$key"
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Fallback: Check global videos if language-specific query returned no trailer
+                                            if (extractedTrailer.isBlank()) {
+                                                try {
+                                                    val fbVideoUrl = "https://api.themoviedb.org/3/${if (isTv) "tv" else "movie"}/$id/videos?api_key=$tmdbKey"
+                                                    val fbReq = Request.Builder().url(fbVideoUrl).build()
+                                                    client.newCall(fbReq).execute().use { fbResp ->
+                                                        if (fbResp.isSuccessful) {
+                                                            val fbBody = fbResp.body?.string()
+                                                            if (!fbBody.isNullOrBlank()) {
+                                                                val fbJson = JSONObject(fbBody)
+                                                                val fbResults = fbJson.optJSONArray("results")
+                                                                if (fbResults != null && fbResults.length() > 0) {
+                                                                    for (idx in 0 until fbResults.length()) {
+                                                                        val vItem = fbResults.getJSONObject(idx)
+                                                                        val site = vItem.optString("site", "")
+                                                                        val key = vItem.optString("key", "")
+                                                                        val vType = vItem.optString("type", "")
+                                                                        if (site.equals("YouTube", ignoreCase = true) && key.isNotBlank()) {
+                                                                            extractedTrailer = "https://www.youtube.com/watch?v=$key"
+                                                                            if (vType.equals("Trailer", ignoreCase = true)) break
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (_: Exception) {}
                                             }
 
                                             // Credits (Cast)
@@ -205,68 +266,94 @@ class MetadataService {
                                                     cast = actors.joinToString(", ")
                                                 }
                                             }
-                                        }
-                                    }
-                                }
 
-                                // If TV series, fetch Season 1 episodes for TheTVDB/TMDB episode ordering
-                                if (isTv) {
-                                    val seasonUrl = "https://api.themoviedb.org/3/tv/$id/season/1?api_key=$tmdbKey&language=es-ES"
-                                    val sReq = Request.Builder().url(seasonUrl).build()
-                                    client.newCall(sReq).execute().use { sResp ->
-                                        if (sResp.isSuccessful) {
-                                            val sBody = sResp.body?.string()
-                                            if (!sBody.isNullOrBlank()) {
-                                                val sJson = JSONObject(sBody)
-                                                val epArray = sJson.optJSONArray("episodes") ?: JSONArray()
-                                                val parsedEpisodes = mutableListOf<EpisodeData>()
-                                                for (epIdx in 0 until epArray.length()) {
-                                                    val epObj = epArray.getJSONObject(epIdx)
-                                                    val epNum = epObj.optInt("episode_number", epIdx + 1)
-                                                    val epName = epObj.optString("name", "Episodio $epNum")
-                                                    val epOverview = epObj.optString("overview", "")
-                                                    val epRuntime = epObj.optInt("runtime", 45)
-                                                    val stillPath = epObj.optString("still_path")
-                                                    val stillUrl = if (stillPath.isNotBlank()) "https://image.tmdb.org/t/p/w300$stillPath" else ""
-
-                                                    parsedEpisodes.add(
-                                                        EpisodeData(
-                                                            seasonNumber = 1,
-                                                            episodeNumber = epNum,
-                                                            title = epName,
-                                                            overview = epOverview,
-                                                            runtime = "$epRuntime min",
-                                                            stillUrl = stillUrl
-                                                        )
-                                                    )
-                                                }
-                                                episodesList = parsedEpisodes
+                                            // Fallback trailer search if not present in TMDB
+                                            val finalTrailer = extractedTrailer.ifBlank {
+                                                val queryEncoded = URLEncoder.encode("$detailTitle trailer oficial español", "UTF-8")
+                                                "https://www.youtube.com/results?search_query=$queryEncoded"
                                             }
+
+                                            // If TV series, fetch Season 1 episodes
+                                            if (isTv) {
+                                                val seasonUrl = "https://api.themoviedb.org/3/tv/$id/season/1?api_key=$tmdbKey&language=es-ES"
+                                                val sReq = Request.Builder().url(seasonUrl).build()
+                                                client.newCall(sReq).execute().use { sResp ->
+                                                    if (sResp.isSuccessful) {
+                                                        val sBody = sResp.body?.string()
+                                                        if (!sBody.isNullOrBlank()) {
+                                                            val sJson = JSONObject(sBody)
+                                                            val epArray = sJson.optJSONArray("episodes") ?: JSONArray()
+                                                            val parsedEpisodes = mutableListOf<EpisodeData>()
+                                                            for (epIdx in 0 until epArray.length()) {
+                                                                val epObj = epArray.getJSONObject(epIdx)
+                                                                val epNum = epObj.optInt("episode_number", epIdx + 1)
+                                                                val epName = epObj.optString("name", "Capítulo $epNum")
+                                                                val epOverview = epObj.optString("overview", "")
+                                                                val epRuntime = epObj.optInt("runtime", 45)
+                                                                val stillPath = epObj.optString("still_path")
+                                                                val stillUrl = if (stillPath.isNotBlank()) "https://image.tmdb.org/t/p/w300$stillPath" else ""
+
+                                                                parsedEpisodes.add(
+                                                                    EpisodeData(
+                                                                        seasonNumber = 1,
+                                                                        episodeNumber = epNum,
+                                                                        title = epName,
+                                                                        overview = epOverview,
+                                                                        runtime = "$epRuntime min",
+                                                                        stillUrl = stillUrl
+                                                                    )
+                                                                )
+                                                            }
+                                                            episodesList = parsedEpisodes
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            results.add(
+                                                MediaSuggestion(
+                                                    title = detailTitle,
+                                                    description = overview,
+                                                    posterUrl = posterUrl,
+                                                    category = if (isTv) "Series" else "Películas",
+                                                    genre = genre,
+                                                    year = year,
+                                                    duration = duration,
+                                                    cast = cast.ifEmpty { "Reparto principal verificado en TMDB" },
+                                                    source = if (isTv) "TMDB • TheTVDB (Episodios)" else "The Movie Database (TMDB)",
+                                                    imdbRating = imdbRatingFormatted,
+                                                    imdbId = imdbId,
+                                                    tmdbId = id.toString(),
+                                                    episodes = episodesList,
+                                                    awards = "",
+                                                    trailerUrl = finalTrailer
+                                                )
+                                            )
                                         }
                                     }
                                 }
                             } catch (_: Exception) {
-                                // Details fetch failure tolerated
-                            }
-
-                            results.add(
-                                MediaSuggestion(
-                                    title = title,
-                                    description = overview,
-                                    posterUrl = posterUrl,
-                                    category = if (isTv) "Series" else "Películas",
-                                    genre = genre,
-                                    year = year,
-                                    duration = duration,
-                                    cast = cast.ifEmpty { "Reparto principal verificado en TMDB" },
-                                    source = if (isTv) "TMDB • TheTVDB (Episodios)" else "The Movie Database (TMDB)",
-                                    imdbRating = imdbRatingFormatted,
-                                    imdbId = imdbId,
-                                    tmdbId = id.toString(),
-                                    episodes = episodesList,
-                                    awards = ""
+                                // Fallback add item if detail failed
+                                results.add(
+                                    MediaSuggestion(
+                                        title = title,
+                                        description = overview,
+                                        posterUrl = posterUrl,
+                                        category = if (isTv) "Series" else "Películas",
+                                        genre = genre,
+                                        year = year,
+                                        duration = duration,
+                                        cast = "Reparto TMDB",
+                                        source = "The Movie Database (TMDB)",
+                                        imdbRating = imdbRatingFormatted,
+                                        imdbId = "",
+                                        tmdbId = id.toString(),
+                                        episodes = emptyList(),
+                                        awards = "",
+                                        trailerUrl = "https://www.youtube.com/results?search_query=" + URLEncoder.encode("$title trailer oficial español", "UTF-8")
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }

@@ -95,6 +95,7 @@ data class Movie(
     val imdbId: String = "", // e.g. "tt1375666" (de IMDb)
     val tmdbId: String = "", // e.g. "27205" (de The Movie Database)
     val episodesJson: String = "", // Serialized EpisodeData list (Orden de TheTVDB)
+    val trailerUrl: String = "", // YouTube or direct video trailer URL
     val metadataSource: String = "TMDB + IMDb + TheTVDB",
     val addedAt: Long = System.currentTimeMillis()
 ) {

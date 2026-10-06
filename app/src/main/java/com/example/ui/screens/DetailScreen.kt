@@ -567,6 +567,32 @@ fun DetailScreen(
                     }
                 }
 
+                // Official Trailer Button
+                if (movie.trailerUrl.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            try {
+                                val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(movie.trailerUrl))
+                                context.startActivity(openIntent)
+                            } catch (_: Exception) {
+                                android.widget.Toast.makeText(context, "No se pudo abrir el tráiler", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.03f)
+                            .testTag("watch_trailer_button")
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Tráiler", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("🎬 Ver Tráiler Oficial", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+
                 // If playback progress exists, offer options to clear it
                 if (savedProgress > 0) {
                     TextButton(
@@ -783,51 +809,49 @@ fun DetailScreen(
                                                 Spacer(modifier = Modifier.width(12.dp))
 
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text(
-                                                            text = "T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}",
-                                                            color = Color.White,
-                                                            fontSize = 13.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
+                                                    Text(
+                                                        text = "T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}",
+                                                        color = Color.White,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
 
-                                                        if (ep.videoUrl.isNotBlank()) {
-                                                            Spacer(modifier = Modifier.width(6.dp))
-                                                            Surface(
-                                                                shape = RoundedCornerShape(3.dp),
-                                                                color = Color(0xFF2BAD3B).copy(alpha = 0.2f)
+                                                    val isThisEpisode = progressDetails != null &&
+                                                            ep.seasonNumber == progressDetails!!.seasonNumber &&
+                                                            ep.episodeNumber == progressDetails!!.episodeNumber &&
+                                                            progressDetails!!.progressMs > 2000L
+
+                                                    if (isThisEpisode) {
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        val fraction = progressDetails!!.getProgressFraction()
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .width(70.dp)
+                                                                    .height(4.dp)
+                                                                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
                                                             ) {
-                                                                Text(
-                                                                    text = "✓ Enlace listo",
-                                                                    color = Color(0xFF2BAD3B),
-                                                                    fontSize = 9.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .fillMaxHeight()
+                                                                        .fillMaxWidth(fraction.coerceIn(0.05f, 1f))
+                                                                        .background(Color(0xFFFF9900), RoundedCornerShape(2.dp))
                                                                 )
                                                             }
-                                                        }
-
-                                                        val isThisEpisode = progressDetails != null &&
-                                                                ep.seasonNumber == progressDetails!!.seasonNumber &&
-                                                                ep.episodeNumber == progressDetails!!.episodeNumber &&
-                                                                progressDetails!!.progressMs > 2000L
-                                                        if (isThisEpisode) {
-                                                            Spacer(modifier = Modifier.width(6.dp))
-                                                            Surface(
-                                                                shape = RoundedCornerShape(3.dp),
-                                                                color = Color(0xFFFF9900).copy(alpha = 0.25f)
-                                                            ) {
-                                                                Text(
-                                                                    text = "En progreso • ${progressDetails!!.formatProgressTime()}",
-                                                                    color = Color(0xFFFF9900),
-                                                                    fontSize = 9.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                                )
-                                                            }
+                                                            Text(
+                                                                text = "Progreso: ${progressDetails!!.formatProgressTime()} (${(fraction * 100).toInt()}% visto)",
+                                                                color = Color(0xFFFF9900),
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
                                                         }
                                                     }
+
                                                     if (ep.overview.isNotBlank()) {
+                                                        Spacer(modifier = Modifier.height(2.dp))
                                                         Text(
                                                             text = ep.overview,
                                                             color = Color.Gray,

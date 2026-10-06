@@ -77,6 +77,7 @@ object CloudCatalogService {
                             imdbId = obj.optString("imdbId", ""),
                             tmdbId = obj.optString("tmdbId", ""),
                             episodesJson = episodesJson,
+                            trailerUrl = obj.optString("trailerUrl", "").trim(),
                             metadataSource = obj.optString("metadataSource", "Nube PrimePlex")
                         )
                     )
@@ -130,6 +131,7 @@ object CloudCatalogService {
                     put("imdbId", m.imdbId)
                     put("tmdbId", m.tmdbId)
                     put("episodesJson", m.episodesJson)
+                    put("trailerUrl", m.trailerUrl)
                     put("metadataSource", m.metadataSource)
                 }
                 catalogArray.put(itemObj)
@@ -196,6 +198,7 @@ object CloudCatalogService {
                     put("imdbId", m.imdbId)
                     put("tmdbId", m.tmdbId)
                     put("episodesJson", m.episodesJson)
+                    put("trailerUrl", m.trailerUrl)
                     put("metadataSource", m.metadataSource)
                 }
                 catalogArray.put(itemObj)

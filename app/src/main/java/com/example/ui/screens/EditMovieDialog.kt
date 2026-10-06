@@ -44,6 +44,7 @@ fun EditMovieDialog(
     var year by remember { mutableStateOf(movie.year) }
     var duration by remember { mutableStateOf(movie.duration) }
     var cast by remember { mutableStateOf(movie.cast) }
+    var trailerUrl by remember { mutableStateOf(movie.trailerUrl) }
 
     // Video URL for movie
     var movieVideoUrl by remember { mutableStateOf(movie.videoUrl) }
@@ -270,23 +271,70 @@ fun EditMovieDialog(
                                                             }
                                                         }
 
-                                                        OutlinedTextField(
-                                                            value = ep.title,
-                                                            onValueChange = { newT ->
-                                                                seriesEpisodes = seriesEpisodes.toMutableList().also {
-                                                                    it[epIndex] = ep.copy(title = newT)
-                                                                }
-                                                            },
-                                                            label = { Text("Título del capítulo", color = Color.Gray, fontSize = 10.sp) },
-                                                            colors = OutlinedTextFieldDefaults.colors(
-                                                                focusedTextColor = Color.White,
-                                                                unfocusedTextColor = Color.White,
-                                                                focusedBorderColor = Color(0xFF00A8E1),
-                                                                unfocusedBorderColor = Color.Gray
-                                                            ),
-                                                            singleLine = true,
+                                                        // Chapter number, Season number, and Title of episode
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                             modifier = Modifier.fillMaxWidth()
-                                                        )
+                                                        ) {
+                                                            OutlinedTextField(
+                                                                value = if (ep.episodeNumber > 0) ep.episodeNumber.toString() else "",
+                                                                onValueChange = { newEpStr ->
+                                                                    val parsed = newEpStr.filter { it.isDigit() }.toIntOrNull() ?: 1
+                                                                    seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                        it[epIndex] = ep.copy(episodeNumber = parsed)
+                                                                    }
+                                                                },
+                                                                label = { Text("Nº Cap.", color = Color.Gray, fontSize = 10.sp) },
+                                                                colors = OutlinedTextFieldDefaults.colors(
+                                                                    focusedTextColor = Color.White,
+                                                                    unfocusedTextColor = Color.White,
+                                                                    focusedBorderColor = Color(0xFF00A8E1),
+                                                                    unfocusedBorderColor = Color.Gray
+                                                                ),
+                                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                                singleLine = true,
+                                                                modifier = Modifier.width(78.dp)
+                                                            )
+
+                                                            OutlinedTextField(
+                                                                value = if (ep.seasonNumber > 0) ep.seasonNumber.toString() else "",
+                                                                onValueChange = { newSeasonStr ->
+                                                                    val parsedS = newSeasonStr.filter { it.isDigit() }.toIntOrNull() ?: 1
+                                                                    seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                        it[epIndex] = ep.copy(seasonNumber = parsedS)
+                                                                    }
+                                                                },
+                                                                label = { Text("Nº Temp.", color = Color.Gray, fontSize = 10.sp) },
+                                                                colors = OutlinedTextFieldDefaults.colors(
+                                                                    focusedTextColor = Color.White,
+                                                                    unfocusedTextColor = Color.White,
+                                                                    focusedBorderColor = Color(0xFF00A8E1),
+                                                                    unfocusedBorderColor = Color.Gray
+                                                                ),
+                                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                                singleLine = true,
+                                                                modifier = Modifier.width(74.dp)
+                                                            )
+
+                                                            OutlinedTextField(
+                                                                value = ep.title,
+                                                                onValueChange = { newT ->
+                                                                    seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                        it[epIndex] = ep.copy(title = newT)
+                                                                    }
+                                                                },
+                                                                label = { Text("Título del capítulo", color = Color.Gray, fontSize = 10.sp) },
+                                                                colors = OutlinedTextFieldDefaults.colors(
+                                                                    focusedTextColor = Color.White,
+                                                                    unfocusedTextColor = Color.White,
+                                                                    focusedBorderColor = Color(0xFF00A8E1),
+                                                                    unfocusedBorderColor = Color.Gray
+                                                                ),
+                                                                singleLine = true,
+                                                                modifier = Modifier.weight(1f)
+                                                            )
+                                                        }
 
                                                         Spacer(modifier = Modifier.height(4.dp))
 
@@ -419,6 +467,20 @@ fun EditMovieDialog(
                         maxLines = 6,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                     )
+
+                    OutlinedTextField(
+                        value = trailerUrl,
+                        onValueChange = { trailerUrl = it },
+                        label = { Text("Tráiler Oficial (YouTube o enlace directo)", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00A8E1),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
                 }
 
                 // Footer action buttons
@@ -457,6 +519,7 @@ fun EditMovieDialog(
                                 year = year,
                                 duration = duration,
                                 cast = cast.trim(),
+                                trailerUrl = trailerUrl.trim(),
                                 episodesJson = updatedEpisodesJson
                             )
 

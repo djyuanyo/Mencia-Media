@@ -111,6 +111,13 @@ fun AddMovieScreen(
     // MOVIE specific fields
     var movieVideoUrl by remember { mutableStateOf("") }
     var movieDuration by remember { mutableStateOf("120 min") }
+    var trailerUrl by remember { mutableStateOf("") }
+
+    // SERIES Season management dialog states
+    var showAddSeasonDialog by remember { mutableStateOf(false) }
+    var newSeasonInput by remember { mutableStateOf("1") }
+    var seasonToEdit by remember { mutableStateOf<Int?>(null) }
+    var editSeasonInput by remember { mutableStateOf("1") }
 
     // SERIES specific fields: Seasons & Chapters with Video Links
     var seriesEpisodes by remember {
@@ -365,23 +372,25 @@ fun AddMovieScreen(
                         }
                     }
 
-                    // Suggestions row
+                    // Suggestions row with poster thumbnail and trailer badge
                     if (suggestions.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                             contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
                             items(suggestions) { item ->
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = Color(0xFF1E2E4A),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00A8E1).copy(alpha = 0.4f)),
                                     modifier = Modifier
-                                        .width(190.dp)
+                                        .width(260.dp)
                                         .clickable {
                                             title = item.title
                                             description = item.description
                                             if (item.posterUrl.isNotEmpty()) posterUrl = item.posterUrl
+                                            if (item.trailerUrl.isNotEmpty()) trailerUrl = item.trailerUrl
                                             genre = item.genre
                                             year = item.year
                                             cast = item.cast
@@ -391,10 +400,10 @@ fun AddMovieScreen(
                                             metadataSource = item.source
 
                                             // If series, load suggested episodes if available
-                                            if (selectedType == "Serie") {
+                                            if (selectedType == "Serie" || item.category == "Series") {
+                                                if (item.category == "Series") selectedType = "Serie"
                                                 if (item.episodes.isNotEmpty()) {
                                                     seriesEpisodes = item.episodes.map { ep ->
-                                                        // Preserve existing entered videoUrl if any match
                                                         val existing = seriesEpisodes.find {
                                                             it.seasonNumber == ep.seasonNumber && it.episodeNumber == ep.episodeNumber
                                                         }
@@ -405,15 +414,80 @@ fun AddMovieScreen(
                                                 if (item.duration.isNotBlank()) movieDuration = item.duration
                                             }
 
-                                            appliedSourceNotice = "✓ Datos de \"${item.title}\" aplicados con éxito"
-                                            Toast.makeText(context, "Metadatos aplicados: ${item.title}", Toast.LENGTH_SHORT).show()
+                                            val trailerMsg = if (item.trailerUrl.isNotBlank()) " (con tráiler oficial)" else ""
+                                            appliedSourceNotice = "✓ Datos de \"${item.title}\" aplicados con éxito$trailerMsg"
+                                            Toast.makeText(context, "Metadatos aplicados: ${item.title}$trailerMsg", Toast.LENGTH_SHORT).show()
                                         }
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${item.year} • ${item.genre}", color = Color.LightGray, fontSize = 10.sp)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text("Pulsa para aplicar", color = Color(0xFF00A8E1), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Poster thumbnail for clear visual identification
+                                        if (item.posterUrl.isNotBlank()) {
+                                            AsyncImage(
+                                                model = item.posterUrl,
+                                                contentDescription = item.title,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .width(55.dp)
+                                                    .height(82.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0xFF0A182E))
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(55.dp)
+                                                    .height(82.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0xFF0A182E)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.Movie, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(10.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.title,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${item.year} • ${item.genre}",
+                                                color = Color.LightGray,
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(3.dp),
+                                                    color = if (item.category == "Series") Color(0xFFFF9900).copy(alpha = 0.2f) else Color(0xFF00A8E1).copy(alpha = 0.2f)
+                                                ) {
+                                                    Text(
+                                                        text = item.category,
+                                                        color = if (item.category == "Series") Color(0xFFFF9900) else Color(0xFF00A8E1),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                                if (item.trailerUrl.isNotBlank()) {
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("🎬 Tráiler", color = Color(0xFFFF5555), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("Pulsa para aplicar", color = Color(0xFF00A8E1), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -592,16 +666,8 @@ fun AddMovieScreen(
                             Button(
                                 onClick = {
                                     val highestSeason = seriesEpisodes.maxOfOrNull { it.seasonNumber } ?: 0
-                                    val nextSeason = highestSeason + 1
-                                    val newEpisode = EpisodeData(
-                                        seasonNumber = nextSeason,
-                                        episodeNumber = 1,
-                                        title = "Capítulo 1",
-                                        videoUrl = "",
-                                        runtime = "45 min"
-                                    )
-                                    seriesEpisodes = seriesEpisodes + newEpisode
-                                    Toast.makeText(context, "Temporada $nextSeason añadida", Toast.LENGTH_SHORT).show()
+                                    newSeasonInput = (highestSeason + 1).toString()
+                                    showAddSeasonDialog = true
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2BAD3B)),
                                 shape = RoundedCornerShape(6.dp),
@@ -662,7 +728,21 @@ fun AddMovieScreen(
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            IconButton(
+                                                onClick = {
+                                                    seasonToEdit = seasonNum
+                                                    editSeasonInput = seasonNum.toString()
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Edit,
+                                                    contentDescription = "Cambiar número de temporada",
+                                                    tint = Color(0xFF00A8E1),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = "(${seasonEpisodes.size} capítulos)",
                                                 color = Color.LightGray,
@@ -740,24 +820,70 @@ fun AddMovieScreen(
 
                                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                                // Title of episode
-                                                OutlinedTextField(
-                                                    value = ep.title,
-                                                    onValueChange = { newTitle ->
-                                                        seriesEpisodes = seriesEpisodes.toMutableList().also {
-                                                            it[overallIndex] = ep.copy(title = newTitle)
-                                                        }
-                                                    },
-                                                    label = { Text("Nombre del capítulo", color = Color.Gray, fontSize = 11.sp) },
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedBorderColor = Color(0xFF00A8E1),
-                                                        unfocusedBorderColor = Color.Gray
-                                                    ),
-                                                    singleLine = true,
+                                                // Chapter number, Season number, and Title of episode (editable)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     modifier = Modifier.fillMaxWidth()
-                                                )
+                                                ) {
+                                                    OutlinedTextField(
+                                                        value = if (ep.episodeNumber > 0) ep.episodeNumber.toString() else "",
+                                                        onValueChange = { newEpStr ->
+                                                            val parsedEp = newEpStr.filter { it.isDigit() }.toIntOrNull() ?: 1
+                                                            seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                it[overallIndex] = ep.copy(episodeNumber = parsedEp)
+                                                            }
+                                                        },
+                                                        label = { Text("Nº Cap.", color = Color.Gray, fontSize = 10.sp) },
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedBorderColor = Color(0xFF00A8E1),
+                                                            unfocusedBorderColor = Color.Gray
+                                                        ),
+                                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                        singleLine = true,
+                                                        modifier = Modifier.width(82.dp)
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = if (ep.seasonNumber > 0) ep.seasonNumber.toString() else "",
+                                                        onValueChange = { newSeasonStr ->
+                                                            val parsedSeason = newSeasonStr.filter { it.isDigit() }.toIntOrNull() ?: 1
+                                                            seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                it[overallIndex] = ep.copy(seasonNumber = parsedSeason)
+                                                            }
+                                                        },
+                                                        label = { Text("Nº Temp.", color = Color.Gray, fontSize = 10.sp) },
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedBorderColor = Color(0xFF00A8E1),
+                                                            unfocusedBorderColor = Color.Gray
+                                                        ),
+                                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                                        singleLine = true,
+                                                        modifier = Modifier.width(78.dp)
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = ep.title,
+                                                        onValueChange = { newTitle ->
+                                                            seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                it[overallIndex] = ep.copy(title = newTitle)
+                                                            }
+                                                        },
+                                                        label = { Text("Nombre del capítulo", color = Color.Gray, fontSize = 10.sp) },
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedTextColor = Color.White,
+                                                            unfocusedTextColor = Color.White,
+                                                            focusedBorderColor = Color(0xFF00A8E1),
+                                                            unfocusedBorderColor = Color.Gray
+                                                        ),
+                                                        singleLine = true,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
 
                                                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -891,6 +1017,22 @@ fun AddMovieScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
             )
 
+            // Tráiler Oficial field
+            OutlinedTextField(
+                value = trailerUrl,
+                onValueChange = { trailerUrl = it },
+                label = { Text("Tráiler Oficial (YouTube o enlace directo)", color = Color.Gray) },
+                placeholder = { Text("Ej: https://www.youtube.com/watch?v=...", color = Color.DarkGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF00A8E1),
+                    unfocusedBorderColor = Color.Gray
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).testTag("trailer_url_input")
+            )
+
             // Destacar toggle
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -942,6 +1084,7 @@ fun AddMovieScreen(
                             imdbId = imdbId.trim(),
                             tmdbId = tmdbId.trim(),
                             episodesJson = "",
+                            trailerUrl = trailerUrl.trim(),
                             metadataSource = metadataSource.ifEmpty { "TMDB + IMDb" }
                         )
                         Toast.makeText(context, "¡Película \"${title.trim()}\" guardada con éxito!", Toast.LENGTH_SHORT).show()
@@ -970,6 +1113,7 @@ fun AddMovieScreen(
                             imdbId = imdbId.trim(),
                             tmdbId = tmdbId.trim(),
                             episodesJson = jsonEpisodes,
+                            trailerUrl = trailerUrl.trim(),
                             metadataSource = metadataSource.ifEmpty { "TMDB + TheTVDB" }
                         )
                         Toast.makeText(context, "¡Serie \"${title.trim()}\" guardada con $totalEps capítulos en $seasonsCount temporadas!", Toast.LENGTH_SHORT).show()
@@ -993,5 +1137,109 @@ fun AddMovieScreen(
                 )
             }
         }
+    }
+
+    // DIALOG: ADD CUSTOM SEASON NUMBER
+    if (showAddSeasonDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddSeasonDialog = false },
+            title = { Text("Añadir Nueva Temporada", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Indica el número de la temporada que deseas añadir a la serie:", color = Color.LightGray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = newSeasonInput,
+                        onValueChange = { newSeasonInput = it.filter { c -> c.isDigit() } },
+                        label = { Text("Número de temporada", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00A8E1),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val sNum = newSeasonInput.toIntOrNull() ?: 1
+                        val newEpisode = EpisodeData(
+                            seasonNumber = sNum,
+                            episodeNumber = 1,
+                            title = "Capítulo 1",
+                            videoUrl = "",
+                            runtime = "45 min"
+                        )
+                        seriesEpisodes = seriesEpisodes + newEpisode
+                        showAddSeasonDialog = false
+                        Toast.makeText(context, "Temporada $sNum añadida", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2BAD3B))
+                ) {
+                    Text("Añadir Temporada", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddSeasonDialog = false }) {
+                    Text("Cancelar", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF0A182E)
+        )
+    }
+
+    // DIALOG: EDIT EXISTING SEASON NUMBER
+    if (seasonToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { seasonToEdit = null },
+            title = { Text("Cambiar Número de Temporada", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Introduce el nuevo número para esta temporada:", color = Color.LightGray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = editSeasonInput,
+                        onValueChange = { editSeasonInput = it.filter { c -> c.isDigit() } },
+                        label = { Text("Nuevo número de temporada", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00A8E1),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val oldSeason = seasonToEdit!!
+                        val newSeason = editSeasonInput.toIntOrNull() ?: oldSeason
+                        seriesEpisodes = seriesEpisodes.map { ep ->
+                            if (ep.seasonNumber == oldSeason) ep.copy(seasonNumber = newSeason) else ep
+                        }
+                        seasonToEdit = null
+                        Toast.makeText(context, "Temporada cambiada a $newSeason", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1))
+                ) {
+                    Text("Guardar", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { seasonToEdit = null }) {
+                    Text("Cancelar", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF0A182E)
+        )
     }
 }

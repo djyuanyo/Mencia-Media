@@ -236,6 +236,7 @@ class MovieViewModel(
         imdbId: String = "",
         tmdbId: String = "",
         episodesJson: String = "",
+        trailerUrl: String = "",
         metadataSource: String = "TMDB + IMDb + TheTVDB"
     ) {
         viewModelScope.launch {
@@ -266,6 +267,7 @@ class MovieViewModel(
                     imdbId = imdbId,
                     tmdbId = tmdbId,
                     episodesJson = episodesJson,
+                    trailerUrl = trailerUrl,
                     metadataSource = metadataSource
                 )
             )
