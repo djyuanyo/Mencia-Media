@@ -39,99 +39,98 @@ fun AddMovieScreen(
     onMovieSaved: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val isAdmin by viewModel.isAdmin.collectAsState()
+
+    // If not admin, show restricted access notice as requested
+    if (!isAdmin) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF09111E))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color(0xFFFF9900),
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Acceso Exclusivo de Administrador",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Solo el administrador oficial (juanjocarrillo7@gmail.com) tiene permisos para añadir o modificar contenido en la biblioteca.\n\nEl resto de usuarios registrados pueden navegar y reproducir todo el contenido añadido desde Inicio y Buscar.",
+                        color = Color.LightGray,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    // PRIMARY TYPE SELECTOR (Película vs Serie) - Required first choice per user request
+    var selectedType by remember { mutableStateOf("Película") } // "Película" or "Serie"
+
     var searchQuery by remember { mutableStateOf("") }
     val suggestions by viewModel.metadataSuggestions.collectAsState()
     val isSearchingMetadata by viewModel.isSearchingMetadata.collectAsState()
 
+    // Common fields
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var videoUrl by remember { mutableStateOf("") }
     var posterUrl by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Películas") }
     var genre by remember { mutableStateOf("Acción") }
     var year by remember { mutableStateOf("2026") }
-    var duration by remember { mutableStateOf("120 min") }
     var cast by remember { mutableStateOf("") }
     var imdbRating by remember { mutableStateOf("") }
     var imdbId by remember { mutableStateOf("") }
     var tmdbId by remember { mutableStateOf("") }
-    var episodesList by remember { mutableStateOf<List<EpisodeData>>(emptyList()) }
-    var metadataSource by remember { mutableStateOf("TMDB + IMDb + TheTVDB") }
     var isFeatured by remember { mutableStateOf(false) }
     var isFetchingImdbScore by remember { mutableStateOf(false) }
-
+    var metadataSource by remember { mutableStateOf("TMDB + IMDb + TheTVDB") }
     var appliedSourceNotice by remember { mutableStateOf<String?>(null) }
-    var showApiKeyDialog by remember { mutableStateOf(false) }
-    var customKeyInput by remember { mutableStateOf(viewModel.getCustomTmdbKey()) }
 
-    val categories = listOf("Películas", "Series", "Documentales")
+    // MOVIE specific fields
+    var movieVideoUrl by remember { mutableStateOf("") }
+    var movieDuration by remember { mutableStateOf("120 min") }
+
+    // SERIES specific fields: Seasons & Chapters with Video Links
+    var seriesEpisodes by remember {
+        mutableStateOf(
+            listOf(
+                EpisodeData(
+                    seasonNumber = 1,
+                    episodeNumber = 1,
+                    title = "Capítulo 1",
+                    videoUrl = "",
+                    runtime = "45 min"
+                )
+            )
+        )
+    }
+
     val genres = listOf("Acción", "Comedia", "Drama", "Sci-Fi", "Fantasía", "Terror", "Documental", "Animación")
-
-    var categoryExpanded by remember { mutableStateOf(false) }
     var genreExpanded by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
-
-    // API Key Dialog
-    if (showApiKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showApiKeyDialog = false },
-            title = {
-                Text(
-                    "Configuración de Fuentes de Metadatos",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        "PrimePlex busca metadatos simultáneamente en las 3 bibliotecas oficiales:\n" +
-                                "• TMDB (The Movie Database): Resúmenes y reparto en español.\n" +
-                                "• IMDb: Puntuaciones oficiales y valoraciones.\n" +
-                                "• TheTVDB: Orden de episodios y temporadas para series.\n\n" +
-                                "Si tienes tu propia clave de TMDB v3 puedes ingresarla aquí (o dejarla vacía para usar la clave estándar integrada):",
-                        color = Color.LightGray,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = customKeyInput,
-                        onValueChange = { customKeyInput = it },
-                        label = { Text("Clave API TMDB v3 (Opcional)", color = Color.Gray) },
-                        placeholder = { Text("Clave API de 32 caracteres", color = Color.DarkGray) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF00A8E1),
-                            unfocusedBorderColor = Color.Gray
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.setCustomTmdbKey(customKeyInput)
-                        showApiKeyDialog = false
-                        Toast.makeText(context, "Configuración guardada", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1))
-                ) {
-                    Text("Guardar", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showApiKeyDialog = false }) {
-                    Text("Cerrar", color = Color.Gray)
-                }
-            },
-            containerColor = Color(0xFF0F1E36)
-        )
-    }
 
     Box(
         modifier = Modifier
@@ -151,12 +150,12 @@ fun AddMovieScreen(
                 contentDescription = null,
                 tint = Color(0xFF00A8E1),
                 modifier = Modifier
-                    .size(44.dp)
-                    .padding(bottom = 8.dp)
+                    .size(40.dp)
+                    .padding(bottom = 6.dp)
             )
 
             Text(
-                "Añadir a Biblioteca",
+                "Añadir a la Biblioteca",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -164,14 +163,121 @@ fun AddMovieScreen(
             )
 
             Text(
-                "Reconocimiento de TMDB, IMDb y TheTVDB estilo Plex",
-                color = Color(0xFF00A8E1),
-                fontSize = 13.sp,
+                "Panel de Administrador • juanjocarrillo7@gmail.com",
+                color = Color(0xFF2BAD3B),
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 1. PLEX-STYLE AUTO METADATA SEARCH CARD (TMDB + IMDb + TheTVDB)
+            // ========================================================
+            // 1. STEP 1: SELECT "PELÍCULA" OR "SERIE" (MANDATORY FIRST CHOICE)
+            // ========================================================
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp)
+                    .testTag("type_selector_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "1. Elige el tipo de contenido que vas a añadir:",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Option A: Película
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selectedType == "Película") Color(0xFF00A8E1) else Color(0xFF1E2E4A),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = if (selectedType == "Película") 2.dp else 1.dp,
+                                color = if (selectedType == "Película") Color.White else Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    selectedType = "Película"
+                                    appliedSourceNotice = null
+                                }
+                                .testTag("select_type_movie")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 14.dp, horizontal = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "🎬",
+                                    fontSize = 26.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Película",
+                                    color = if (selectedType == "Película") Color.Black else Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "1 enlace de vídeo principal",
+                                    color = if (selectedType == "Película") Color.Black.copy(alpha = 0.8f) else Color.LightGray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Option B: Serie
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selectedType == "Serie") Color(0xFF00A8E1) else Color(0xFF1E2E4A),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = if (selectedType == "Serie") 2.dp else 1.dp,
+                                color = if (selectedType == "Serie") Color.White else Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    selectedType = "Serie"
+                                    appliedSourceNotice = null
+                                }
+                                .testTag("select_type_series")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 14.dp, horizontal = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "📺",
+                                    fontSize = 26.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Serie",
+                                    color = if (selectedType == "Serie") Color.Black else Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Temporadas y capítulos con enlace",
+                                    color = if (selectedType == "Serie") Color.Black.copy(alpha = 0.8f) else Color.LightGray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ========================================================
+            // 2. AUTO METADATA SEARCH ASSISTANT (TMDB / IMDb / TheTVDB)
+            // ========================================================
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36)),
                 shape = RoundedCornerShape(12.dp),
@@ -186,104 +292,33 @@ fun AddMovieScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Asistente de Metadatos Oficiales (TMDB / IMDb)",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFFFF9900).copy(alpha = 0.2f)
+                        ) {
                             Text(
-                                text = "plex",
+                                text = "Autocompletar",
                                 color = Color(0xFFFF9900),
-                                fontWeight = FontWeight.Black,
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Agente de Metadatos Multi-Fuente",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showApiKeyDialog = true },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Ajustes de fuentes",
-                                tint = Color(0xFF00A8E1),
-                                modifier = Modifier.size(18.dp)
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 3 Source Indicator Badges
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // TMDB Badge
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFF01B4E4).copy(alpha = 0.2f),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text("TMDB", color = Color(0xFF01B4E4), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Resúmenes", color = Color.White, fontSize = 9.sp)
-                            }
-                        }
-
-                        // IMDb Badge
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFF5C518).copy(alpha = 0.2f),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text("IMDb", color = Color(0xFFF5C518), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Puntuación", color = Color.White, fontSize = 9.sp)
-                            }
-                        }
-
-                        // TheTVDB Badge
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFF2BAD3B).copy(alpha = 0.2f),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text("TheTVDB", color = Color(0xFF2BAD3B), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Episodios", color = Color.White, fontSize = 9.sp)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Busca por título para obtener sinopsis y reparto de TMDB, valoraciones de IMDb y orden de episodios de TheTVDB:",
+                        text = "Busca el título para rellenar portada, sinopsis y reparto automáticamente:",
                         color = Color.LightGray,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
+                        fontSize = 12.sp
                     )
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -292,7 +327,7 @@ fun AddMovieScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Ej: Inception, Breaking Bad, Avatar...", color = Color.Gray, fontSize = 13.sp) },
+                            placeholder = { Text("Ej: Inception, Stranger Things, Gladiator...", color = Color.Gray, fontSize = 13.sp) },
                             singleLine = true,
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
@@ -305,12 +340,9 @@ fun AddMovieScreen(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 focusedBorderColor = Color(0xFF00A8E1),
-                                unfocusedBorderColor = Color.Gray,
-                                cursorColor = Color(0xFF00A8E1)
+                                unfocusedBorderColor = Color.Gray
                             ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("plex_search_input")
+                            modifier = Modifier.weight(1f)
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -321,225 +353,448 @@ fun AddMovieScreen(
                                     viewModel.searchMetadata(searchQuery)
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF00A8E1),
-                                contentColor = Color.Black
-                            ),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1)),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .height(56.dp)
-                                .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
-                                .testTag("plex_search_button")
+                            modifier = Modifier.height(52.dp)
                         ) {
                             if (isSearchingMetadata) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = Color.Black,
-                                    strokeWidth = 2.dp
-                                )
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Search, contentDescription = "Buscar")
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black)
                             }
                         }
                     }
 
-                    // Metadata results carousel
-                    AnimatedVisibility(visible = suggestions.isNotEmpty()) {
-                        Column(modifier = Modifier.padding(top = 16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Coincidencias encontradas (${suggestions.size}):",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                TextButton(onClick = { viewModel.clearMetadataSuggestions() }) {
-                                    Text("Ocultar", color = Color.Gray, fontSize = 11.sp)
+                    // Suggestions row
+                    if (suggestions.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            items(suggestions) { item ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFF1E2E4A),
+                                    modifier = Modifier
+                                        .width(190.dp)
+                                        .clickable {
+                                            title = item.title
+                                            description = item.description
+                                            if (item.posterUrl.isNotEmpty()) posterUrl = item.posterUrl
+                                            genre = item.genre
+                                            year = item.year
+                                            cast = item.cast
+                                            imdbRating = item.imdbRating
+                                            imdbId = item.imdbId
+                                            tmdbId = item.tmdbId
+                                            metadataSource = item.source
+
+                                            // If series, load suggested episodes if available
+                                            if (selectedType == "Serie") {
+                                                if (item.episodes.isNotEmpty()) {
+                                                    seriesEpisodes = item.episodes.map { ep ->
+                                                        // Preserve existing entered videoUrl if any match
+                                                        val existing = seriesEpisodes.find {
+                                                            it.seasonNumber == ep.seasonNumber && it.episodeNumber == ep.episodeNumber
+                                                        }
+                                                        ep.copy(videoUrl = existing?.videoUrl ?: "")
+                                                    }
+                                                }
+                                            } else {
+                                                if (item.duration.isNotBlank()) movieDuration = item.duration
+                                            }
+
+                                            appliedSourceNotice = "✓ Datos de \"${item.title}\" aplicados con éxito"
+                                            Toast.makeText(context, "Metadatos aplicados: ${item.title}", Toast.LENGTH_SHORT).show()
+                                        }
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${item.year} • ${item.genre}", color = Color.LightGray, fontSize = 10.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Pulsa para aplicar", color = Color(0xFF00A8E1), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
+                        }
+                    }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                    appliedSourceNotice?.let { notice ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = notice, color = Color(0xFF2BAD3B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
 
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // ========================================================
+            // 3. TITLE & POSTER FIELDS
+            // ========================================================
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(if (selectedType == "Película") "Título de la película" else "Título de la serie", color = Color.Gray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF00A8E1),
+                    unfocusedBorderColor = Color.Gray
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp)
+                    .testTag("add_item_title_input")
+            )
+
+            OutlinedTextField(
+                value = posterUrl,
+                onValueChange = { posterUrl = it },
+                label = { Text("URL de Portada / Carátula", color = Color.Gray) },
+                placeholder = { Text("https://image.tmdb.org/t/p/w500/...", color = Color.DarkGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF00A8E1),
+                    unfocusedBorderColor = Color.Gray
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp)
+            )
+
+            if (posterUrl.isNotBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = posterUrl,
+                        contentDescription = "Vista previa",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(50.dp, 75.dp).clip(RoundedCornerShape(6.dp))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Vista previa de la carátula oficial", color = Color.LightGray, fontSize = 12.sp)
+                }
+            }
+
+            // ========================================================
+            // 4. SPECIFIC FIELDS: PELÍCULA VS SERIE
+            // ========================================================
+            if (selectedType == "Película") {
+                // Movie Video URL (Google Drive / WordPress / MP4)
+                OutlinedTextField(
+                    value = movieVideoUrl,
+                    onValueChange = { movieVideoUrl = it },
+                    label = { Text("Enlace de Vídeo de la Película (Google Drive o WordPress)", color = Color.Gray) },
+                    placeholder = { Text("https://drive.google.com/file/d/... o https://...mp4", color = Color.DarkGray) },
+                    leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF00A8E1)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF00A8E1),
+                        unfocusedBorderColor = Color.Gray
+                    ),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                        .testTag("movie_video_url_input")
+                )
+
+                if (com.example.util.GoogleDriveStreamResolver.isGoogleDriveUrl(movieVideoUrl)) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF00A8E1).copy(alpha = 0.2f),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    ) {
+                        Text(
+                            text = "✓ Enlace de Google Drive detectado: se reproducirá directamente con ExoPlayer HD",
+                            color = Color(0xFF00A8E1),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    OutlinedTextField(
+                        value = movieDuration,
+                        onValueChange = { movieDuration = it },
+                        label = { Text("Duración", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00A8E1),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = year,
+                        onValueChange = { year = it },
+                        label = { Text("Año", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00A8E1),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+            } else {
+                // ========================================================
+                // SERIE: SECCIÓN DE TEMPORADAS Y CAPÍTULOS CON ENLACE
+                // "Si es serie quiero que salga añadir temporadas y añadir capítulos. En cada capítulo pongo enlace."
+                // ========================================================
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1E30)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00A8E1).copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp)
+                        .testTag("series_seasons_card")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.List,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00A8E1),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Temporadas y Capítulos",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Button to Add New Season
+                            Button(
+                                onClick = {
+                                    val highestSeason = seriesEpisodes.maxOfOrNull { it.seasonNumber } ?: 0
+                                    val nextSeason = highestSeason + 1
+                                    val newEpisode = EpisodeData(
+                                        seasonNumber = nextSeason,
+                                        episodeNumber = 1,
+                                        title = "Capítulo 1",
+                                        videoUrl = "",
+                                        runtime = "45 min"
+                                    )
+                                    seriesEpisodes = seriesEpisodes + newEpisode
+                                    Toast.makeText(context, "Temporada $nextSeason añadida", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2BAD3B)),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("add_season_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Añadir Temporada", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Text(
+                            text = "Organiza las temporadas de la serie. En cada capítulo, pega su enlace de vídeo (Google Drive o WordPress):",
+                            color = Color.LightGray,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+
+                        // Distinct seasons grouped
+                        val seasonNumbers = seriesEpisodes.map { it.seasonNumber }.distinct().sorted()
+
+                        if (seasonNumbers.isEmpty()) {
+                            seriesEpisodes = listOf(
+                                EpisodeData(seasonNumber = 1, episodeNumber = 1, title = "Capítulo 1", videoUrl = "")
+                            )
+                        }
+
+                        seasonNumbers.forEach { seasonNum ->
+                            val seasonEpisodes = seriesEpisodes.filter { it.seasonNumber == seasonNum }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // SEASON CONTAINER
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF14243B),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E3A5F)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(suggestions) { item ->
-                                    val suggestionInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .width(240.dp)
-                                            .border(1.dp, Color(0xFF00A8E1).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                            .tvFocusable(
-                                                shape = RoundedCornerShape(8.dp),
-                                                focusedBorderColor = Color(0xFF00A8E1),
-                                                focusedScale = 1.06f,
-                                                interactionSource = suggestionInteraction
-                                            )
-                                            .clickable(
-                                                interactionSource = suggestionInteraction,
-                                                indication = null
-                                            ) {
-                                                title = item.title
-                                                description = item.description
-                                                if (item.posterUrl.isNotEmpty()) posterUrl = item.posterUrl
-                                                category = item.category
-                                                genre = item.genre
-                                                year = item.year
-                                                duration = item.duration
-                                                cast = item.cast
-                                                imdbRating = item.imdbRating
-                                                imdbId = item.imdbId
-                                                tmdbId = item.tmdbId
-                                                episodesList = item.episodes
-                                                metadataSource = item.source
-                                                appliedSourceNotice = "✓ Datos aplicados: ${item.title} (${item.year}) • ${item.source}"
-                                                Toast.makeText(context, "Metadatos aplicados: ${item.title}", Toast.LENGTH_SHORT).show()
-                                            }
-                                            .testTag("suggestion_card_${item.title}")
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    // Season header
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Column(modifier = Modifier.padding(10.dp)) {
-                                            Row(verticalAlignment = Alignment.Top) {
-                                                if (item.posterUrl.isNotEmpty()) {
-                                                    AsyncImage(
-                                                        model = item.posterUrl,
-                                                        contentDescription = item.title,
-                                                        contentScale = ContentScale.Crop,
-                                                        modifier = Modifier
-                                                            .width(60.dp)
-                                                            .height(85.dp)
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                    )
-                                                    Spacer(modifier = Modifier.width(10.dp))
-                                                }
-                                                Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = Color(0xFF00A8E1).copy(alpha = 0.2f)
+                                            ) {
+                                                Text(
+                                                    text = "TEMPORADA $seasonNum",
+                                                    color = Color(0xFF00A8E1),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "(${seasonEpisodes.size} capítulos)",
+                                                color = Color.LightGray,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+
+                                        // Button to add chapter to this season
+                                        TextButton(
+                                            onClick = {
+                                                val nextEpNum = (seasonEpisodes.maxOfOrNull { it.episodeNumber } ?: 0) + 1
+                                                val newEp = EpisodeData(
+                                                    seasonNumber = seasonNum,
+                                                    episodeNumber = nextEpNum,
+                                                    title = "Capítulo $nextEpNum",
+                                                    videoUrl = "",
+                                                    runtime = "45 min"
+                                                )
+                                                seriesEpisodes = seriesEpisodes + newEp
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("+ Añadir Capítulo", color = Color(0xFF00A8E1), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // List of chapters inside this season
+                                    seasonEpisodes.forEachIndexed { idxInSeason, ep ->
+                                        val overallIndex = seriesEpisodes.indexOf(ep)
+
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFF0F1E36),
+                                            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF223A5E)),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
                                                     Text(
-                                                        text = item.title,
-                                                        color = Color.White,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    Text(
-                                                        text = "${item.year} • ${item.category}",
+                                                        text = "Capítulo ${ep.episodeNumber}",
                                                         color = Color(0xFF00A8E1),
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.SemiBold
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold
                                                     )
 
-                                                    // IMDb rating score pill
-                                                    if (item.imdbRating.isNotBlank()) {
-                                                        Surface(
-                                                            shape = RoundedCornerShape(3.dp),
-                                                            color = Color(0xFFF5C518),
-                                                            modifier = Modifier.padding(top = 2.dp)
+                                                    // Delete chapter button
+                                                    if (seriesEpisodes.size > 1) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                                    it.removeAt(overallIndex)
+                                                                }
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
                                                         ) {
-                                                            Text(
-                                                                text = "IMDb ${item.imdbRating} ★",
-                                                                color = Color.Black,
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Black,
-                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            Icon(
+                                                                Icons.Default.Delete,
+                                                                contentDescription = "Eliminar capítulo",
+                                                                tint = Color(0xFFFF6B6B),
+                                                                modifier = Modifier.size(16.dp)
                                                             )
                                                         }
                                                     }
+                                                }
 
+                                                Spacer(modifier = Modifier.height(6.dp))
+
+                                                // Title of episode
+                                                OutlinedTextField(
+                                                    value = ep.title,
+                                                    onValueChange = { newTitle ->
+                                                        seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                            it[overallIndex] = ep.copy(title = newTitle)
+                                                        }
+                                                    },
+                                                    label = { Text("Nombre del capítulo", color = Color.Gray, fontSize = 11.sp) },
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedBorderColor = Color(0xFF00A8E1),
+                                                        unfocusedBorderColor = Color.Gray
+                                                    ),
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                // VIDEO URL FOR THIS CHAPTER
+                                                OutlinedTextField(
+                                                    value = ep.videoUrl,
+                                                    onValueChange = { newUrl ->
+                                                        seriesEpisodes = seriesEpisodes.toMutableList().also {
+                                                            it[overallIndex] = ep.copy(videoUrl = newUrl.trim())
+                                                        }
+                                                    },
+                                                    label = { Text("Enlace de vídeo del capítulo (Google Drive / WordPress)", color = Color(0xFFFF9900), fontSize = 11.sp) },
+                                                    placeholder = { Text("https://drive.google.com/... o enlace directo", color = Color.DarkGray, fontSize = 11.sp) },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFFF9900), modifier = Modifier.size(18.dp))
+                                                    },
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedTextColor = Color.White,
+                                                        unfocusedTextColor = Color.White,
+                                                        focusedBorderColor = Color(0xFFFF9900),
+                                                        unfocusedBorderColor = Color.Gray
+                                                    ),
+                                                    singleLine = true,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .testTag("episode_video_url_${seasonNum}_${ep.episodeNumber}")
+                                                )
+
+                                                if (com.example.util.GoogleDriveStreamResolver.isGoogleDriveUrl(ep.videoUrl)) {
                                                     Text(
-                                                        text = item.genre,
-                                                        color = Color.LightGray,
+                                                        text = "✓ Enlace de Google Drive asignado",
+                                                        color = Color(0xFF2BAD3B),
                                                         fontSize = 10.sp,
-                                                        modifier = Modifier.padding(top = 2.dp)
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(top = 2.dp, start = 4.dp)
                                                     )
                                                 }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(6.dp))
-
-                                            // Source badge
-                                            Surface(
-                                                shape = RoundedCornerShape(3.dp),
-                                                color = Color(0xFF0F1E36)
-                                            ) {
-                                                Text(
-                                                    text = item.source,
-                                                    color = Color(0xFF00A8E1),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-
-                                            Spacer(modifier = Modifier.height(4.dp))
-
-                                            Text(
-                                                text = item.description,
-                                                color = Color.Gray,
-                                                fontSize = 10.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-
-                                            if (item.cast.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(3.dp))
-                                                Text(
-                                                    text = "Reparto: ${item.cast}",
-                                                    color = Color(0xFFFF9900),
-                                                    fontSize = 9.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-
-                                            // TheTVDB Episode count indicator
-                                            if (item.episodes.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(3.dp))
-                                                Text(
-                                                    text = "TheTVDB: ${item.episodes.size} episodios ordenados",
-                                                    color = Color(0xFF2BAD3B),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            Button(
-                                                onClick = {
-                                                    title = item.title
-                                                    description = item.description
-                                                    if (item.posterUrl.isNotEmpty()) posterUrl = item.posterUrl
-                                                    category = item.category
-                                                    genre = item.genre
-                                                    year = item.year
-                                                    duration = item.duration
-                                                    cast = item.cast
-                                                    imdbRating = item.imdbRating
-                                                    imdbId = item.imdbId
-                                                    tmdbId = item.tmdbId
-                                                    episodesList = item.episodes
-                                                    metadataSource = item.source
-                                                    appliedSourceNotice = "✓ Datos aplicados: ${item.title} (${item.year}) • ${item.source}"
-                                                    Toast.makeText(context, "Metadatos aplicados: ${item.title}", Toast.LENGTH_SHORT).show()
-                                                },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = Color(0xFF1A94FF),
-                                                    contentColor = Color.White
-                                                ),
-                                                shape = RoundedCornerShape(4.dp),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(30.dp)
-                                            ) {
-                                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Usar estos datos", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -547,312 +802,32 @@ fun AddMovieScreen(
                             }
                         }
                     }
-
-                    // Notice when applied
-                    appliedSourceNotice?.let { notice ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = notice,
-                            color = Color(0xFF2BAD3B),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
-            }
-
-            // 2. VIDEO STREAM LINK (OPCIONAL)
-            OutlinedTextField(
-                value = videoUrl,
-                onValueChange = { newUrl ->
-                    videoUrl = newUrl
-                    if (title.isBlank() && newUrl.isNotBlank()) {
-                        val extracted = viewModel.extractCleanTitle(newUrl)
-                        if (extracted.isNotBlank() && !extracted.startsWith("http")) {
-                            searchQuery = extracted
-                            title = extracted
-                        }
-                    }
-                },
-                label = { Text("Enlace de Vídeo / Streaming (Opcional)", color = Color.Gray) },
-                placeholder = { Text("https://... (Opcional: puedes guardar sin enlace)", color = Color.DarkGray) },
-                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color.Gray) },
-                trailingIcon = {
-                    if (videoUrl.isNotEmpty()) {
-                        TextButton(onClick = {
-                            val extracted = viewModel.extractCleanTitle(videoUrl)
-                            if (extracted.isNotBlank()) {
-                                searchQuery = extracted
-                                viewModel.searchMetadata(extracted)
-                            }
-                        }) {
-                            Text("Detectar", color = Color(0xFF00A8E1), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF00A8E1),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color(0xFF00A8E1)
-                ),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp)
-                    .testTag("add_item_video_url_input")
-            )
-
-            Text(
-                "Opcional. Acepta enlaces directos de Google Drive o WordPress. Si no tienes enlace, guárdalo igualmente: aparecerá en tu biblioteca y página de inicio con todos sus datos.",
-                color = Color.LightGray,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp, start = 4.dp)
-            )
-
-            if (com.example.util.GoogleDriveStreamResolver.isGoogleDriveUrl(videoUrl)) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color(0xFF00A8E1).copy(alpha = 0.2f),
-                    modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
-                ) {
-                    Text(
-                        "✓ Enlace de Google Drive detectado: se reproducirá directamente con ExoPlayer HD",
-                        color = Color(0xFF00A8E1),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // 3. TITLE OF MEDIA
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Título de la obra (TMDB / IMDb)", color = Color.Gray) },
-                trailingIcon = {
-                    if (title.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = title
-                            viewModel.searchMetadata(title)
-                        }) {
-                            Icon(Icons.Default.Search, contentDescription = "Buscar metadatos", tint = Color(0xFF00A8E1))
-                        }
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF00A8E1),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color(0xFF00A8E1)
-                ),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .testTag("add_item_title_input")
-            )
-
-            // 4. POSTER URL
-            OutlinedTextField(
-                value = posterUrl,
-                onValueChange = { posterUrl = it },
-                label = { Text("URL de Portada / Póster (Detectado de TMDB / TheTVDB)", color = Color.Gray) },
-                placeholder = { Text("https://image.tmdb.org/t/p/w500/...", color = Color.DarkGray) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF00A8E1),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color(0xFF00A8E1)
-                ),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            // Preview poster thumbnail if available
-            if (posterUrl.isNotBlank()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = posterUrl,
-                        contentDescription = "Vista previa portada",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(60.dp, 85.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text("Vista previa de la carátula oficial", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Obtenida desde ${metadataSource.ifEmpty { "TMDB" }}", color = Color(0xFF00A8E1), fontSize = 11.sp)
-                    }
-                }
-            }
-
-            // 5. IMDB RATING & IMDB ID ROW
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = imdbRating,
-                    onValueChange = { imdbRating = it },
-                    label = { Text("Puntuación IMDb (⭐)", color = Color.Gray) },
-                    placeholder = { Text("Ej: 8.8", color = Color.DarkGray) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFF5C518),
-                        unfocusedBorderColor = Color.Gray,
-                        cursorColor = Color(0xFFF5C518)
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
 
                 OutlinedTextField(
-                    value = imdbId,
-                    onValueChange = { imdbId = it },
-                    label = { Text("ID de IMDb", color = Color.Gray) },
-                    placeholder = { Text("Ej: tt1375666", color = Color.DarkGray) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFF5C518),
-                        unfocusedBorderColor = Color.Gray,
-                        cursorColor = Color(0xFFF5C518)
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Live IMDb score fetcher button & visual status
-            Button(
-                onClick = {
-                    if (title.isBlank() && imdbId.isBlank()) {
-                        Toast.makeText(context, "Escribe primero un título o ID de IMDb", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    isFetchingImdbScore = true
-                    viewModel.fetchImdbForDraft(title, imdbId, category == "Series") { details ->
-                        isFetchingImdbScore = false
-                        if (details.rating.isNotBlank()) {
-                            imdbRating = details.rating
-                            if (details.imdbId.isNotBlank()) imdbId = details.imdbId
-                            if (details.duration.isNotBlank() && duration == "120 min") duration = details.duration
-                            if (details.genre.isNotBlank() && genre == "Acción") genre = details.genre
-                            Toast.makeText(context, "IMDb: ${details.rating} ★ (${details.scoreLabel})", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "No se encontró puntuación en IMDb para este título", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5C518)),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .testTag("fetch_imdb_button")
-            ) {
-                if (isFetchingImdbScore) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Consultando puntuación en IMDb...", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                } else {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        if (imdbRating.isNotBlank()) "Actualizar valoración IMDb (${imdbRating} ★)" else "Obtener puntuación oficial de IMDb en vivo",
-                        color = Color.Black,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // 6. ACTORS / REPARTO (TMDB)
-            OutlinedTextField(
-                value = cast,
-                onValueChange = { cast = it },
-                label = { Text("Actores y Reparto (The Movie Database TMDB)", color = Color.Gray) },
-                placeholder = { Text("Ej: Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page...", color = Color.DarkGray) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color(0xFF00A8E1),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color(0xFF00A8E1)
-                ),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .testTag("add_item_cast_input")
-            )
-
-            // 7. CATEGORY SELECTOR
-            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Categoría (Películas / Series)", color = Color.Gray) },
-                    trailingIcon = {
-                        Icon(
-                            Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.clickable { categoryExpanded = !categoryExpanded }
-                        )
-                    },
+                    value = year,
+                    onValueChange = { year = it },
+                    label = { Text("Año de la serie", color = Color.Gray) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
                         focusedBorderColor = Color(0xFF00A8E1),
                         unfocusedBorderColor = Color.Gray
                     ),
-                    modifier = Modifier.fillMaxWidth().clickable { categoryExpanded = !categoryExpanded }
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
                 )
-                DropdownMenu(
-                    expanded = categoryExpanded,
-                    onDismissRequest = { categoryExpanded = false },
-                    modifier = Modifier.background(Color(0xFF1E2E4A)).fillMaxWidth(0.9f)
-                ) {
-                    categories.forEach { cat ->
-                        DropdownMenuItem(
-                            text = { Text(cat, color = Color.White) },
-                            onClick = {
-                                category = cat
-                                categoryExpanded = false
-                            }
-                        )
-                    }
-                }
             }
 
-            // 8. GENRE SELECTOR
-            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            // ========================================================
+            // 5. GENRE & CAST & SINOPSIS (COMMON)
+            // ========================================================
+            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
                 OutlinedTextField(
                     value = genre,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Género Cinematográfico", color = Color.Gray) },
+                    label = { Text("Género", color = Color.Gray) },
                     trailingIcon = {
                         Icon(
                             Icons.Default.ArrowDropDown,
@@ -886,120 +861,42 @@ fun AddMovieScreen(
                 }
             }
 
-            // 9. YEAR AND DURATION
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = year,
-                    onValueChange = { year = it },
-                    label = { Text("Año", color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF00A8E1),
-                        unfocusedBorderColor = Color.Gray,
-                        cursorColor = Color(0xFF00A8E1)
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-
-                OutlinedTextField(
-                    value = duration,
-                    onValueChange = { duration = it },
-                    label = { Text("Duración / Episodios", color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF00A8E1),
-                        unfocusedBorderColor = Color.Gray,
-                        cursorColor = Color(0xFF00A8E1)
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // 10. DESCRIPTION / SINOPSIS (TMDB)
             OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Sinopsis de la obra (The Movie Database TMDB)", color = Color.Gray) },
+                value = cast,
+                onValueChange = { cast = it },
+                label = { Text("Reparto / Actores", color = Color.Gray) },
+                placeholder = { Text("Ej: Pedro Pascal, Bella Ramsey...", color = Color.DarkGray) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     focusedBorderColor = Color(0xFF00A8E1),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color(0xFF00A8E1)
+                    unfocusedBorderColor = Color.Gray
                 ),
-                minLines = 3,
-                maxLines = 6,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
             )
 
-            // 11. THETVDB ORDERED EPISODES PREVIEW (For Series)
-            if (category == "Series" && episodesList.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2214)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 20.dp)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF2BAD3B), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "Guía de Episodios (Orden TheTVDB): ${episodesList.size} eps",
-                                color = Color(0xFF2BAD3B),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        episodesList.take(4).forEach { ep ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Text(ep.runtime, color = Color.LightGray, fontSize = 11.sp)
-                            }
-                        }
-                        if (episodesList.size > 4) {
-                            Text(
-                                "...y ${episodesList.size - 4} episodios más guardados en el orden de TheTVDB",
-                                color = Color.Gray,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Sinopsis / Resumen", color = Color.Gray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF00A8E1),
+                    unfocusedBorderColor = Color.Gray
+                ),
+                minLines = 3,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
+            )
 
-            // 12. FEATURED TOGGLE
+            // Destacar toggle
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp)
+                    .padding(bottom = 20.dp)
                     .clickable { isFeatured = !isFeatured }
             ) {
                 Checkbox(
@@ -1011,78 +908,89 @@ fun AddMovieScreen(
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        "Destacar portada en carrusel principal",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Aparecerá en el banner panorámico superior de Inicio.",
-                        color = Color.Gray,
-                        fontSize = 11.sp
-                    )
-                }
+                Text(
+                    "Destacar en carrusel principal de Inicio",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
-            // SUBMIT BUTTON
+            // ========================================================
+            // 6. SAVE BUTTON
+            // ========================================================
             Button(
                 onClick = {
                     if (title.trim().isEmpty()) {
-                        Toast.makeText(context, "Por favor escribe al menos el título de la película o serie", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val episodesJson = if (episodesList.isNotEmpty()) {
-                            EpisodeData.listToJson(episodesList)
-                        } else ""
+                        Toast.makeText(context, "Por favor escribe al menos el título", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
 
+                    if (selectedType == "Película") {
                         viewModel.addMovie(
                             title = title.trim(),
                             description = description.trim().ifEmpty { "Sin sinopsis disponible." },
-                            videoUrl = videoUrl.trim(),
+                            videoUrl = movieVideoUrl.trim(),
                             posterUrl = posterUrl.trim(),
-                            category = category,
+                            category = "Películas",
                             genre = genre,
                             year = year.ifEmpty { "2026" },
-                            duration = duration.ifEmpty { if (category == "Series") "${episodesList.size.coerceAtLeast(1)} eps" else "120 min" },
+                            duration = movieDuration.ifEmpty { "120 min" },
                             isFeatured = isFeatured,
                             cast = cast.trim(),
                             imdbRating = imdbRating.trim(),
                             imdbId = imdbId.trim(),
                             tmdbId = tmdbId.trim(),
-                            episodesJson = episodesJson,
-                            metadataSource = metadataSource.ifEmpty { "TMDB + IMDb + TheTVDB" }
+                            episodesJson = "",
+                            metadataSource = metadataSource.ifEmpty { "TMDB + IMDb" }
                         )
-                        Toast.makeText(context, "¡\"${title.trim()}\" guardado con éxito en tu biblioteca!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "¡Película \"${title.trim()}\" guardada con éxito!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Series: Convert seasons and chapters
+                        val seasonsCount = seriesEpisodes.map { it.seasonNumber }.distinct().size
+                        val totalEps = seriesEpisodes.size
+                        val formattedDuration = "$totalEps caps ($seasonsCount temp)"
+                        val jsonEpisodes = EpisodeData.listToJson(seriesEpisodes)
 
-                        // Reset forms
-                        title = ""
-                        description = ""
-                        videoUrl = ""
-                        posterUrl = ""
-                        cast = ""
-                        imdbRating = ""
-                        imdbId = ""
-                        tmdbId = ""
-                        episodesList = emptyList()
-                        isFeatured = false
-                        appliedSourceNotice = null
+                        // If series has chapters with video, pick first chapter's video as default fallback videoUrl
+                        val firstVideo = seriesEpisodes.firstOrNull { it.videoUrl.isNotBlank() }?.videoUrl ?: ""
 
-                        onMovieSaved()
+                        viewModel.addMovie(
+                            title = title.trim(),
+                            description = description.trim().ifEmpty { "Sin sinopsis disponible." },
+                            videoUrl = firstVideo,
+                            posterUrl = posterUrl.trim(),
+                            category = "Series",
+                            genre = genre,
+                            year = year.ifEmpty { "2026" },
+                            duration = formattedDuration,
+                            isFeatured = isFeatured,
+                            cast = cast.trim(),
+                            imdbRating = imdbRating.trim(),
+                            imdbId = imdbId.trim(),
+                            tmdbId = tmdbId.trim(),
+                            episodesJson = jsonEpisodes,
+                            metadataSource = metadataSource.ifEmpty { "TMDB + TheTVDB" }
+                        )
+                        Toast.makeText(context, "¡Serie \"${title.trim()}\" guardada con $totalEps capítulos en $seasonsCount temporadas!", Toast.LENGTH_SHORT).show()
                     }
+
+                    onMovieSaved()
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF00A8E1), // Prime Blue
-                    contentColor = Color.Black
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1)),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
-                    .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.05f)
+                    .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
                     .testTag("submit_movie_button")
             ) {
-                Text("Guardar en mi Biblioteca", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (selectedType == "Película") "Guardar Película en la Biblioteca" else "Guardar Serie en la Biblioteca",
+                    color = Color.Black,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

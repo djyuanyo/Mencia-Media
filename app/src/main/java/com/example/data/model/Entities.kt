@@ -14,13 +14,24 @@ data class Profile(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "user_accounts")
+data class UserAccount(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val email: String,
+    val password: String,
+    val name: String,
+    val isAdmin: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 data class EpisodeData(
     val seasonNumber: Int = 1,
     val episodeNumber: Int = 1,
     val title: String = "",
     val overview: String = "",
     val runtime: String = "45 min",
-    val stillUrl: String = ""
+    val stillUrl: String = "",
+    val videoUrl: String = "" // Video link for this episode (Google Drive, WordPress, MP4, etc.)
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("seasonNumber", seasonNumber)
@@ -29,6 +40,7 @@ data class EpisodeData(
         put("overview", overview)
         put("runtime", runtime)
         put("stillUrl", stillUrl)
+        put("videoUrl", videoUrl)
     }
 
     companion object {
@@ -38,7 +50,8 @@ data class EpisodeData(
             title = json.optString("title", ""),
             overview = json.optString("overview", ""),
             runtime = json.optString("runtime", "45 min"),
-            stillUrl = json.optString("stillUrl", "")
+            stillUrl = json.optString("stillUrl", ""),
+            videoUrl = json.optString("videoUrl", "")
         )
 
         fun listToJson(list: List<EpisodeData>): String {

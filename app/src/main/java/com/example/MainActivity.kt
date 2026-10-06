@@ -21,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.data.local.AppDatabase
 import com.example.data.repository.MovieRepository
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.DetailScreen
 import com.example.ui.screens.MainHubScreen
 import com.example.ui.screens.PlayerScreen
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val isInitialized by viewModel.isInitialized.collectAsState()
+                val currentUserAccount by viewModel.currentUserAccount.collectAsState()
                 val currentProfile by viewModel.currentProfile.collectAsState()
 
                 if (!isInitialized) {
@@ -60,11 +62,31 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val navController = rememberNavController()
 
+                    val startDestination = if (currentUserAccount == null) {
+                        "auth"
+                    } else if (currentProfile == null) {
+                        "profile_selection"
+                    } else {
+                        "main_hub"
+                    }
+
                     NavHost(
                         navController = navController,
-                        startDestination = if (currentProfile == null) "profile_selection" else "main_hub",
+                        startDestination = startDestination,
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        // 0. User Authentication (Login & Registration)
+                        composable("auth") {
+                            AuthScreen(
+                                viewModel = viewModel,
+                                onAuthSuccess = {
+                                    navController.navigate("main_hub") {
+                                        popUpTo("auth") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
                         // 1. Profile Selection Screen
                         composable("profile_selection") {
                             ProfileSelectionScreen(
@@ -77,7 +99,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 2. Main Platform Hub (Initiated Home, Search, Upload, Space)
+                        // 2. Main Platform Hub (Inicio, Buscar, Subir si Admin, Mi Espacio)
                         composable("main_hub") {
                             MainHubScreen(
                                 viewModel = viewModel,
@@ -88,8 +110,8 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("player/$movieId")
                                 },
                                 onLogoutProfile = {
-                                    viewModel.selectProfile(null)
-                                    navController.navigate("profile_selection") {
+                                    viewModel.logoutUser()
+                                    navController.navigate("auth") {
                                         popUpTo(0) { inclusive = true }
                                     }
                                 }
@@ -105,8 +127,12 @@ class MainActivity : ComponentActivity() {
                             DetailScreen(
                                 movieId = movieId,
                                 viewModel = viewModel,
-                                onNavigateToPlayer = { id ->
-                                    navController.navigate("player/$id")
+                                onNavigateToPlayer = { id, epIndex ->
+                                    if (epIndex >= 0) {
+                                        navController.navigate("player/$id?episodeIndex=$epIndex")
+                                    } else {
+                                        navController.navigate("player/$id")
+                                    }
                                 },
                                 onNavigateBack = {
                                     navController.popBackStack()
@@ -116,12 +142,35 @@ class MainActivity : ComponentActivity() {
 
                         // 4. Immersive Landscape Media Video Player Controller
                         composable(
+                            route = "player/{movieId}?episodeIndex={episodeIndex}",
+                            arguments = listOf(
+                                navArgument("movieId") { type = NavType.IntType },
+                                navArgument("episodeIndex") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
+                            val episodeIndex = backStackEntry.arguments?.getInt("episodeIndex") ?: -1
+                            PlayerScreen(
+                                movieId = movieId,
+                                episodeIndex = episodeIndex,
+                                viewModel = viewModel,
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable(
                             route = "player/{movieId}",
                             arguments = listOf(navArgument("movieId") { type = NavType.IntType })
                         ) { backStackEntry ->
                             val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
                             PlayerScreen(
                                 movieId = movieId,
+                                episodeIndex = -1,
                                 viewModel = viewModel,
                                 onNavigateBack = {
                                     navController.popBackStack()

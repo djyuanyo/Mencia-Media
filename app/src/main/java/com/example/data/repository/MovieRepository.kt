@@ -4,6 +4,7 @@ import com.example.data.local.MovieDao
 import com.example.data.model.Movie
 import com.example.data.model.PlaybackProgress
 import com.example.data.model.Profile
+import com.example.data.model.UserAccount
 import com.example.data.model.Watchlist
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,54 @@ class MovieRepository(private val movieDao: MovieDao) {
         }
     }
     suspend fun deleteMovie(movie: Movie) = movieDao.deleteMovie(movie)
+    suspend fun updateMovie(movie: Movie) = movieDao.updateMovie(movie)
+
+    // --- USER ACCOUNTS & AUTHENTICATION ---
+    val allUsers: Flow<List<UserAccount>> = movieDao.getAllUsers()
+
+    suspend fun getUserByEmail(email: String): UserAccount? = movieDao.getUserByEmailDirect(email.trim())
+
+    suspend fun authenticateUser(email: String, password: String): UserAccount? {
+        val cleanEmail = email.trim()
+        val cleanPassword = password.trim()
+        // Check fixed admin credentials as requested
+        if (cleanEmail.equals("juanjocarrillo7@gmail.com", ignoreCase = true) && cleanPassword == "Menciano15") {
+            var admin = movieDao.getUserByEmailDirect("juanjocarrillo7@gmail.com")
+            if (admin == null) {
+                val adminUser = UserAccount(
+                    email = "juanjocarrillo7@gmail.com",
+                    password = "Menciano15",
+                    name = "Juan José (Admin)",
+                    isAdmin = true
+                )
+                val id = movieDao.insertUser(adminUser)
+                admin = adminUser.copy(id = id.toInt())
+            }
+            return admin
+        }
+        return movieDao.authenticateUser(cleanEmail, cleanPassword)
+    }
+
+    suspend fun registerUser(email: String, password: String, name: String): UserAccount {
+        val cleanEmail = email.trim()
+        val cleanPassword = password.trim()
+        val cleanName = name.trim().ifEmpty { cleanEmail.substringBefore("@") }
+        val isAdmin = cleanEmail.equals("juanjocarrillo7@gmail.com", ignoreCase = true)
+
+        val existing = movieDao.getUserByEmailDirect(cleanEmail)
+        if (existing != null) {
+            throw IllegalArgumentException("Ya existe una cuenta con el correo $cleanEmail")
+        }
+
+        val newUser = UserAccount(
+            email = cleanEmail,
+            password = cleanPassword,
+            name = cleanName,
+            isAdmin = isAdmin
+        )
+        val id = movieDao.insertUser(newUser)
+        return newUser.copy(id = id.toInt())
+    }
 
     fun getWatchlistForProfile(profileId: Int): Flow<List<Movie>> = movieDao.getWatchlistForProfile(profileId)
     fun isInWatchlist(profileId: Int, movieId: Int): Flow<Boolean> = movieDao.isInWatchlist(profileId, movieId)
@@ -104,6 +153,19 @@ class MovieRepository(private val movieDao: MovieDao) {
     fun getContinueWatching(profileId: Int): Flow<List<Movie>> = movieDao.getContinueWatchingMovies(profileId)
 
     suspend fun prepopulateIfNeeded() {
+        // Pre-seed official admin user
+        val existingAdmin = movieDao.getUserByEmailDirect("juanjocarrillo7@gmail.com")
+        if (existingAdmin == null) {
+            movieDao.insertUser(
+                UserAccount(
+                    email = "juanjocarrillo7@gmail.com",
+                    password = "Menciano15",
+                    name = "Juan José (Admin)",
+                    isAdmin = true
+                )
+            )
+        }
+
         val existingProfiles = allProfiles.first()
         if (existingProfiles.isEmpty()) {
             movieDao.insertProfile(Profile(name = "Juan (Admin)", avatarColorIndex = 0, isKid = false))

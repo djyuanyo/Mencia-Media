@@ -67,6 +67,7 @@ import java.util.Locale
 @Composable
 fun PlayerScreen(
     movieId: Int,
+    episodeIndex: Int = -1,
     viewModel: MovieViewModel,
     onNavigateBack: () -> Unit
 ) {
@@ -105,7 +106,28 @@ fun PlayerScreen(
         return
     }
 
-    if (movie.videoUrl.isBlank()) {
+    val episodes = remember(movie.episodesJson) { movie.getEpisodes() }
+    val isSeries = movie.category.equals("Series", ignoreCase = true)
+
+    // Determine target episode and target stream URL
+    val targetEpisode = if (isSeries && episodes.isNotEmpty()) {
+        if (episodeIndex in episodes.indices) {
+            episodes[episodeIndex]
+        } else {
+            // Find first episode with video URL or fallback to first episode
+            episodes.firstOrNull { it.videoUrl.isNotBlank() } ?: episodes.first()
+        }
+    } else null
+
+    val resolvedEpisodeIndex = if (targetEpisode != null) episodes.indexOf(targetEpisode) else -1
+
+    val activeVideoUrl = if (targetEpisode != null) {
+        targetEpisode.videoUrl.ifBlank { movie.videoUrl }
+    } else {
+        movie.videoUrl
+    }
+
+    if (activeVideoUrl.isBlank()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -132,7 +154,10 @@ fun PlayerScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "\"${movie.title}\" está en tu biblioteca con todos sus metadatos oficiales, pero no cuenta con un enlace de vídeo para reproducir.",
+                    text = if (targetEpisode != null)
+                        "El capítulo \"T${targetEpisode.seasonNumber}:E${targetEpisode.episodeNumber} ${targetEpisode.title}\" no cuenta con un enlace de vídeo para reproducir."
+                    else
+                        "\"${movie.title}\" está en tu biblioteca con todos sus metadatos oficiales, pero no cuenta con un enlace de vídeo para reproducir.",
                     color = Color.LightGray,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(horizontal = 24.dp),
@@ -154,6 +179,11 @@ fun PlayerScreen(
     // Pure Native ExoPlayer Instance (No WebViews, No Google Drive player overlays)
     NativePlexExoPlayer(
         movie = movie,
+        activeVideoUrl = activeVideoUrl,
+        episodeIndex = resolvedEpisodeIndex,
+        episodeTitle = targetEpisode?.title ?: "",
+        seasonNumber = targetEpisode?.seasonNumber ?: 1,
+        episodeNumber = targetEpisode?.episodeNumber ?: 1,
         viewModel = viewModel,
         onNavigateBack = onNavigateBack
     )
@@ -168,6 +198,11 @@ fun PlayerScreen(
 @Composable
 private fun NativePlexExoPlayer(
     movie: Movie,
+    activeVideoUrl: String,
+    episodeIndex: Int,
+    episodeTitle: String,
+    seasonNumber: Int,
+    episodeNumber: Int,
     viewModel: MovieViewModel,
     onNavigateBack: () -> Unit
 ) {
@@ -227,12 +262,12 @@ private fun NativePlexExoPlayer(
     }
 
     // Resolve Google Drive or direct stream URL and pass to ExoPlayer
-    LaunchedEffect(movie.videoUrl, retryCount) {
+    LaunchedEffect(activeVideoUrl, retryCount) {
         isResolving = true
         isBuffering = true
         streamError = null
         try {
-            val resolved = GoogleDriveStreamResolver.resolveStream(movie.videoUrl)
+            val resolved = GoogleDriveStreamResolver.resolveStream(activeVideoUrl)
             resolvedStream = resolved
             isResolving = false
 
@@ -319,7 +354,15 @@ private fun NativePlexExoPlayer(
             val finalPos = exoPlayer.currentPosition
             val finalDur = exoPlayer.duration
             if (finalPos > 1000L && finalDur > 0) {
-                viewModel.updatePlaybackProgress(movie.id, finalPos, finalDur)
+                viewModel.updatePlaybackProgress(
+                    movieId = movie.id,
+                    progressMs = finalPos,
+                    durationMs = finalDur,
+                    episodeIndex = episodeIndex,
+                    episodeNumber = episodeNumber,
+                    seasonNumber = seasonNumber,
+                    episodeTitle = episodeTitle
+                )
             }
             exoPlayer.removeListener(listener)
             exoPlayer.release()
@@ -335,7 +378,15 @@ private fun NativePlexExoPlayer(
                 if (pos >= 0) currentPosMs = pos
                 if (dur > 0) durationMs = dur
                 if (pos > 0 && dur > 0 && isPlaying) {
-                    viewModel.updatePlaybackProgress(movie.id, pos, dur)
+                    viewModel.updatePlaybackProgress(
+                        movieId = movie.id,
+                        progressMs = pos,
+                        durationMs = dur,
+                        episodeIndex = episodeIndex,
+                        episodeNumber = episodeNumber,
+                        seasonNumber = seasonNumber,
+                        episodeTitle = episodeTitle
+                    )
                 }
             }
             delay(1000)
@@ -627,7 +678,12 @@ private fun NativePlexExoPlayer(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = movie.title,
+                                    text = if (episodeIndex >= 0 && episodeTitle.isNotBlank())
+                                        "${movie.title} • T${seasonNumber}:E${episodeNumber} $episodeTitle"
+                                    else if (episodeIndex >= 0)
+                                        "${movie.title} • T${seasonNumber}:E${episodeNumber}"
+                                    else
+                                        movie.title,
                                     color = Color.White,
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold
@@ -638,7 +694,7 @@ private fun NativePlexExoPlayer(
                                     color = Color(0xFF00A8E1)
                                 ) {
                                     Text(
-                                        text = "STREAMING DIRECTO",
+                                        text = if (episodeIndex >= 0) "EPISODIO HD" else "STREAMING DIRECTO",
                                         color = Color.Black,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Black,

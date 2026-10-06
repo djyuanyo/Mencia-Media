@@ -4,11 +4,28 @@ import androidx.room.*
 import com.example.data.model.Movie
 import com.example.data.model.PlaybackProgress
 import com.example.data.model.Profile
+import com.example.data.model.UserAccount
 import com.example.data.model.Watchlist
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MovieDao {
+
+    // --- USER ACCOUNTS ---
+    @Query("SELECT * FROM user_accounts WHERE LOWER(email) = LOWER(:email) LIMIT 1")
+    suspend fun getUserByEmailDirect(email: String): UserAccount?
+
+    @Query("SELECT * FROM user_accounts WHERE LOWER(email) = LOWER(:email) AND password = :password LIMIT 1")
+    suspend fun authenticateUser(email: String, password: String): UserAccount?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUser(user: UserAccount): Long
+
+    @Query("SELECT * FROM user_accounts ORDER BY createdAt ASC")
+    fun getAllUsers(): Flow<List<UserAccount>>
+
+    @Query("SELECT COUNT(*) FROM user_accounts")
+    suspend fun getUserCount(): Int
 
     // --- PROFILES ---
     @Query("SELECT * FROM profiles ORDER BY createdAt ASC")
@@ -35,6 +52,9 @@ interface MovieDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMovie(movie: Movie): Long
+
+    @Update
+    suspend fun updateMovie(movie: Movie)
 
     @Delete
     suspend fun deleteMovie(movie: Movie)

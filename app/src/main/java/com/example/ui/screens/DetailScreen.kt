@@ -37,7 +37,7 @@ import com.example.ui.viewmodel.MovieViewModel
 fun DetailScreen(
     movieId: Int,
     viewModel: MovieViewModel,
-    onNavigateToPlayer: (Int) -> Unit,
+    onNavigateToPlayer: (Int, Int) -> Unit = { _, _ -> },
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -56,12 +56,63 @@ fun DetailScreen(
         return
     }
 
+    val isAdmin by viewModel.isAdmin.collectAsState()
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
     val inWatchlist by viewModel.isMovieInWatchlist(movieId).collectAsState(initial = false)
     val savedProgress by viewModel.getMoviePlaybackProgress(movieId).collectAsState(initial = 0L)
     val progressDetails by viewModel.getMoviePlaybackProgressDetails(movieId).collectAsState(initial = null)
     val isRefreshingImdb by viewModel.isRefreshingImdb.collectAsState()
     val scrollState = rememberScrollState()
     val episodes = remember(movie.episodesJson) { movie.getEpisodes() }
+
+    // Dialog to confirm deletion
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text("¿Eliminar de la biblioteca?", color = Color.White, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "¿Estás seguro de que deseas eliminar permanentemente \"${movie.title}\" de la biblioteca?\n\nEsta acción no se puede deshacer.",
+                    color = Color.LightGray,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        viewModel.deleteMovie(movie)
+                        android.widget.Toast.makeText(context, "\"${movie.title}\" ha sido eliminada", android.widget.Toast.LENGTH_SHORT).show()
+                        onNavigateBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914))
+                ) {
+                    Text("Eliminar definitivamente", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancelar", color = Color.LightGray)
+                }
+            },
+            containerColor = Color(0xFF0F1E36)
+        )
+    }
+
+    // Dialog to edit movie or series
+    if (showEditDialog) {
+        EditMovieDialog(
+            movie = movie,
+            viewModel = viewModel,
+            onDismiss = { showEditDialog = false },
+            onUpdated = { }
+        )
+    }
 
     Scaffold(
         containerColor = Color(0xFF09111E),
@@ -204,7 +255,7 @@ fun DetailScreen(
                 if (hasProgress && hasVideo) {
                     // 1. Primary "Seguir viendo" Button with exact minute and second
                     Button(
-                        onClick = { onNavigateToPlayer(movie.id) },
+                        onClick = { onNavigateToPlayer(movie.id, progressDetails?.episodeIndex ?: -1) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A94FF)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
@@ -267,7 +318,7 @@ fun DetailScreen(
                     OutlinedButton(
                         onClick = {
                             viewModel.updatePlaybackProgress(movie.id, 0L, progressDetails!!.durationMs)
-                            onNavigateToPlayer(movie.id)
+                            onNavigateToPlayer(movie.id, 0)
                         },
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -287,7 +338,7 @@ fun DetailScreen(
                     Button(
                         onClick = {
                             if (hasVideo) {
-                                onNavigateToPlayer(movie.id)
+                                onNavigateToPlayer(movie.id, -1)
                             } else {
                                 android.widget.Toast.makeText(
                                     context,
@@ -321,6 +372,65 @@ fun DetailScreen(
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // ADMIN ACTIONS PANEL (EDITAR / ELIMINAR)
+                // Visible ONLY to the administrator (juanjocarrillo7@gmail.com)
+                // -------------------------------------------------------------
+                if (isAdmin) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF132238)),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF00A8E1).copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth().testTag("admin_controls_panel")
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00A8E1),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Gestión de Administrador (juanjocarrillo7@gmail.com)",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { showEditDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1)),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).testTag("admin_edit_button")
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Editar Contenido", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                Button(
+                                    onClick = { showDeleteConfirmDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).testTag("admin_delete_button")
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Eliminar", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -541,6 +651,12 @@ fun DetailScreen(
                 // THETVDB ORDERED EPISODES SECTION (For Series)
                 // -----------------------------------------------------------------
                 if (movie.category == "Series" || episodes.isNotEmpty()) {
+                    val distinctSeasons = remember(episodes) { episodes.map { it.seasonNumber }.distinct().sorted() }
+                    var activeSeasonFilter by remember { mutableIntStateOf(distinctSeasons.firstOrNull() ?: 1) }
+                    val displayedEpisodes = remember(episodes, activeSeasonFilter) {
+                        if (distinctSeasons.size > 1) episodes.filter { it.seasonNumber == activeSeasonFilter } else episodes
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36)),
@@ -564,7 +680,7 @@ fun DetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        "Episodios (Orden TheTVDB)",
+                                        "Guía de Episodios y Capítulos",
                                         color = Color.White,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold
@@ -576,7 +692,7 @@ fun DetailScreen(
                                     color = Color(0xFF2BAD3B).copy(alpha = 0.2f)
                                 ) {
                                     Text(
-                                        "Temporada 1",
+                                        "${episodes.size} capítulos",
                                         color = Color(0xFF2BAD3B),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -585,9 +701,35 @@ fun DetailScreen(
                                 }
                             }
 
+                            // Season selector pills if more than 1 season exists
+                            if (distinctSeasons.size > 1) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    distinctSeasons.forEach { sNum ->
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (activeSeasonFilter == sNum) Color(0xFF00A8E1) else Color(0xFF1E2E4A),
+                                            modifier = Modifier
+                                                .clickable { activeSeasonFilter = sNum }
+                                        ) {
+                                            Text(
+                                                text = "Temporada $sNum",
+                                                color = if (activeSeasonFilter == sNum) Color.Black else Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            if (episodes.isEmpty()) {
+                            if (displayedEpisodes.isEmpty()) {
                                 Text(
                                     "Esta serie está registrada en el catálogo. Utiliza el reproductor para ver la transmisión principal.",
                                     color = Color.LightGray,
@@ -595,7 +737,10 @@ fun DetailScreen(
                                 )
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    episodes.forEach { ep ->
+                                    displayedEpisodes.forEach { ep ->
+                                        val epIdx = episodes.indexOf(ep)
+                                        val epHasVideo = ep.videoUrl.isNotBlank() || hasVideo
+
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
                                             color = Color(0xFF1E2E4A),
@@ -603,12 +748,12 @@ fun DetailScreen(
                                                 .fillMaxWidth()
                                                 .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.02f)
                                                 .clickable {
-                                                    if (hasVideo) {
-                                                        onNavigateToPlayer(movie.id)
+                                                    if (epHasVideo) {
+                                                        onNavigateToPlayer(movie.id, epIdx)
                                                     } else {
                                                         android.widget.Toast.makeText(
                                                             context,
-                                                            "Esta serie está en tu biblioteca sin enlace de vídeo para reproducir episodios.",
+                                                            "Este capítulo aún no tiene enlace asignado. El administrador puede editarlo.",
                                                             android.widget.Toast.LENGTH_SHORT
                                                         ).show()
                                                     }
@@ -621,13 +766,16 @@ fun DetailScreen(
                                                 Box(
                                                     modifier = Modifier
                                                         .size(36.dp)
-                                                        .background(Color(0xFF00A8E1).copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
+                                                        .background(
+                                                            if (epHasVideo) Color(0xFF00A8E1).copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.2f),
+                                                            RoundedCornerShape(18.dp)
+                                                        ),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.PlayArrow,
-                                                        contentDescription = "Reproducir",
-                                                        tint = Color(0xFF00A8E1),
+                                                        if (epHasVideo) Icons.Default.PlayArrow else Icons.Default.Info,
+                                                        contentDescription = "Reproducir capítulo",
+                                                        tint = if (epHasVideo) Color(0xFF00A8E1) else Color.LightGray,
                                                         modifier = Modifier.size(20.dp)
                                                     )
                                                 }
@@ -642,6 +790,23 @@ fun DetailScreen(
                                                             fontSize = 13.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
+
+                                                        if (ep.videoUrl.isNotBlank()) {
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Surface(
+                                                                shape = RoundedCornerShape(3.dp),
+                                                                color = Color(0xFF2BAD3B).copy(alpha = 0.2f)
+                                                            ) {
+                                                                Text(
+                                                                    text = "✓ Enlace listo",
+                                                                    color = Color(0xFF2BAD3B),
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+
                                                         val isThisEpisode = progressDetails != null &&
                                                                 ep.seasonNumber == progressDetails!!.seasonNumber &&
                                                                 ep.episodeNumber == progressDetails!!.episodeNumber &&

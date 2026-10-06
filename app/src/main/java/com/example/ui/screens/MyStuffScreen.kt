@@ -31,6 +31,8 @@ fun MyStuffScreen(
     onNavigateToDetail: (Int) -> Unit
 ) {
     val activeProfile by viewModel.currentProfile.collectAsState()
+    val currentUserAccount by viewModel.currentUserAccount.collectAsState()
+    val isAdmin by viewModel.isAdmin.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
     val continueWatching by viewModel.continueWatching.collectAsState()
     val allMovies by viewModel.allMovies.collectAsState()
@@ -83,15 +85,29 @@ fun MyStuffScreen(
                             Text(
                                 text = profileNonNull.name,
                                 color = Color.White,
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = if (profileNonNull.isKid) "Perfil Infantil Protegido" else "Perfil Administrador",
-                                color = Color(0xFF00A8E1),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            currentUserAccount?.let { acc ->
+                                Text(
+                                    text = acc.email,
+                                    color = Color.LightGray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = if (isAdmin) Color(0xFF2BAD3B).copy(alpha = 0.2f) else Color(0xFF00A8E1).copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = if (isAdmin) "✓ Administrador Oficial" else "✓ Usuario Registrado",
+                                    color = if (isAdmin) Color(0xFF2BAD3B) else Color(0xFF00A8E1),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
 
                         IconButton(
@@ -102,8 +118,8 @@ fun MyStuffScreen(
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "Cambiar Perfil",
-                                tint = Color.Red
+                                contentDescription = "Cerrar Sesión / Cambiar Cuenta",
+                                tint = Color(0xFFFF6B6B)
                             )
                         }
                     }

@@ -45,6 +45,13 @@ fun MainHubScreen(
     val isTv = remember(context) { DeviceUtils.isTv(context) }
     var activeTab by remember { mutableStateOf(MainTab.INICIO) }
     val activeProfile by viewModel.currentProfile.collectAsState()
+    val isAdmin by viewModel.isAdmin.collectAsState()
+
+    LaunchedEffect(isAdmin) {
+        if (!isAdmin && activeTab == MainTab.SUBIR) {
+            activeTab = MainTab.INICIO
+        }
+    }
 
     BackHandler {
         if (activeTab != MainTab.INICIO) {
@@ -150,24 +157,26 @@ fun MainHubScreen(
                             .testTag("nav_rail_buscar")
                     )
 
-                    // Subir Tab
-                    NavigationRailItem(
-                        selected = activeTab == MainTab.SUBIR,
-                        onClick = { activeTab = MainTab.SUBIR },
-                        icon = { Icon(Icons.Default.Add, contentDescription = "Subir") },
-                        label = { Text("Subir", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationRailItemDefaults.colors(
-                            selectedIconColor = Color(0xFF00A8E1),
-                            selectedTextColor = Color(0xFF00A8E1),
-                            indicatorColor = Color(0xFF09111E),
-                            unselectedIconColor = Color.LightGray,
-                            unselectedTextColor = Color.LightGray
-                        ),
-                        modifier = Modifier
-                            .padding(vertical = 4.dp, horizontal = 8.dp)
-                            .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.1f)
-                            .testTag("nav_rail_subir")
-                    )
+                    // Subir Tab (SOLO ADMINISTRADOR)
+                    if (isAdmin) {
+                        NavigationRailItem(
+                            selected = activeTab == MainTab.SUBIR,
+                            onClick = { activeTab = MainTab.SUBIR },
+                            icon = { Icon(Icons.Default.Add, contentDescription = "Subir") },
+                            label = { Text("Subir", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = Color(0xFF00A8E1),
+                                selectedTextColor = Color(0xFF00A8E1),
+                                indicatorColor = Color(0xFF09111E),
+                                unselectedIconColor = Color.LightGray,
+                                unselectedTextColor = Color.LightGray
+                            ),
+                            modifier = Modifier
+                                .padding(vertical = 4.dp, horizontal = 8.dp)
+                                .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.1f)
+                                .testTag("nav_rail_subir")
+                        )
+                    }
 
                     // Mi Espacio Tab
                     NavigationRailItem(
@@ -353,22 +362,25 @@ fun MainHubScreen(
                                 .testTag("nav_item_buscar")
                         )
 
-                        NavigationBarItem(
-                            selected = activeTab == MainTab.SUBIR,
-                            onClick = { activeTab = MainTab.SUBIR },
-                            label = { Text("Subir", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
-                            icon = { Icon(Icons.Default.Add, contentDescription = "Subir enlace") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF00A8E1),
-                                selectedTextColor = Color(0xFF00A8E1),
-                                indicatorColor = Color(0xFF09111E),
-                                unselectedIconColor = Color.LightGray,
-                                unselectedTextColor = Color.LightGray
-                            ),
-                            modifier = Modifier
-                                .tvFocusable(shape = RoundedCornerShape(8.dp))
-                                .testTag("nav_item_subir")
-                        )
+                        // Subir Tab (SOLO ADMINISTRADOR)
+                        if (isAdmin) {
+                            NavigationBarItem(
+                                selected = activeTab == MainTab.SUBIR,
+                                onClick = { activeTab = MainTab.SUBIR },
+                                label = { Text("Subir", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                                icon = { Icon(Icons.Default.Add, contentDescription = "Subir enlace") },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFF00A8E1),
+                                    selectedTextColor = Color(0xFF00A8E1),
+                                    indicatorColor = Color(0xFF09111E),
+                                    unselectedIconColor = Color.LightGray,
+                                    unselectedTextColor = Color.LightGray
+                                ),
+                                modifier = Modifier
+                                    .tvFocusable(shape = RoundedCornerShape(8.dp))
+                                    .testTag("nav_item_subir")
+                            )
+                        }
 
                         NavigationBarItem(
                             selected = activeTab == MainTab.MI_ESPACIO,

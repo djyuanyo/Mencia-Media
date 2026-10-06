@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.model.Movie
 import com.example.data.model.PlaybackProgress
 import com.example.data.model.Profile
+import com.example.data.model.UserAccount
 import com.example.data.repository.ImdbDetails
 import com.example.data.repository.MediaSuggestion
 import com.example.data.repository.MetadataService
@@ -64,6 +65,14 @@ class MovieViewModel(
             onResult(result)
         }
     }
+
+    // Currently active user account & Administrator permission flag
+    private val _currentUserAccount = MutableStateFlow<UserAccount?>(null)
+    val currentUserAccount: StateFlow<UserAccount?> = _currentUserAccount.asStateFlow()
+
+    val isAdmin: StateFlow<Boolean> = _currentUserAccount.map { user ->
+        user != null && (user.isAdmin || user.email.equals("juanjocarrillo7@gmail.com", ignoreCase = true))
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // All available profiles
     val profiles = repository.allProfiles
@@ -236,6 +245,62 @@ class MovieViewModel(
                 )
             )
         }
+    }
+
+    fun updateMovie(movie: Movie) {
+        viewModelScope.launch {
+            repository.updateMovie(movie)
+        }
+    }
+
+    fun deleteMovie(movie: Movie) {
+        viewModelScope.launch {
+            repository.deleteMovie(movie)
+        }
+    }
+
+    suspend fun login(email: String, password: String): Result<UserAccount> {
+        return try {
+            val user = repository.authenticateUser(email, password)
+            if (user != null) {
+                _currentUserAccount.value = user
+                // Link or create a profile matching user name
+                val currentProfiles = repository.allProfiles.first()
+                val matched = currentProfiles.find { it.name.equals(user.name, ignoreCase = true) }
+                if (matched != null) {
+                    _currentProfile.value = matched
+                } else if (currentProfiles.isNotEmpty()) {
+                    _currentProfile.value = currentProfiles.first()
+                } else {
+                    val newProfile = Profile(name = user.name, avatarColorIndex = 0, isKid = false)
+                    repository.insertProfile(newProfile)
+                    _currentProfile.value = newProfile
+                }
+                Result.success(user)
+            } else {
+                Result.failure(Exception("Correo o contraseña incorrectos"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun register(email: String, password: String, name: String): Result<UserAccount> {
+        return try {
+            val user = repository.registerUser(email, password, name)
+            _currentUserAccount.value = user
+            val newProfile = Profile(name = user.name, avatarColorIndex = 0, isKid = false)
+            repository.insertProfile(newProfile)
+            _currentProfile.value = newProfile
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun logoutUser() {
+        _currentUserAccount.value = null
+        _currentProfile.value = null
     }
 
     fun toggleWatchlist(movieId: Int, inWatchlist: Boolean) {
