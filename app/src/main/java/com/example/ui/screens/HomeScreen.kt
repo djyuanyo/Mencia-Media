@@ -491,7 +491,7 @@ fun HomeScreen(
     }
 }
 
-// 16:9 Aspect Ratio widescreen Cinema Card in Prime Video layout style
+// Vertical Aspect Ratio (2:3) Movie & Series Poster Card
 @Composable
 fun LandscapeMovieCard(
     movie: Movie,
@@ -500,11 +500,11 @@ fun LandscapeMovieCard(
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Card(
         modifier = Modifier
-            .width(170.dp)
-            .height(106.dp)
+            .width(135.dp)
+            .height(202.dp)
             .testTag("movie_card_${movie.id}")
             .tvFocusable(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
                 focusedBorderColor = Color(0xFF00A8E1),
                 focusedScale = 1.08f,
                 interactionSource = interactionSource
@@ -513,8 +513,9 @@ fun LandscapeMovieCard(
                 interactionSource = interactionSource,
                 indication = null
             ) { onClick(movie.id) },
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A))
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2E4A)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -524,7 +525,7 @@ fun LandscapeMovieCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Text overlay container
+            // Bottom gradient overlay for legible titles
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -532,71 +533,104 @@ fun LandscapeMovieCard(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.7f)
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.5f),
+                                Color.Black.copy(alpha = 0.95f)
                             )
                         )
                     )
             )
 
-            // Badge indicating Ficha / Sin Enlace if videoUrl is blank, or Serie tag
-            if (movie.videoUrl.isBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 4.dp),
-                    color = Color(0xFF00A8E1),
-                    modifier = Modifier.align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = "Ficha",
-                        color = Color.Black,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+            // Top Badges
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                if (movie.category.equals("Series", ignoreCase = true)) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF2BAD3B)
+                    ) {
+                        Text(
+                            text = "SERIE",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (movie.videoUrl.isBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF00A8E1)
+                    ) {
+                        Text(
+                            text = "FICHA",
+                            color = Color.Black,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(1.dp))
                 }
-            } else if (movie.category == "Series") {
-                Surface(
-                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 4.dp),
-                    color = Color(0xFF2BAD3B),
-                    modifier = Modifier.align(Alignment.TopStart)
-                ) {
-                    Text(
-                        text = "Serie",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+
+                // IMDb Rating Badge
+                if (movie.imdbRating.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFF5C518)
+                    ) {
+                        Text(
+                            text = "★ ${movie.imdbRating}",
+                            color = Color.Black,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
 
-            // IMDb Rating Badge
-            if (movie.imdbRating.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(topEnd = 6.dp, bottomStart = 4.dp),
-                    color = Color(0xFFF5C518),
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Text(
-                        text = "${movie.imdbRating} ★",
-                        color = Color.Black,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
-                }
-            }
-
-            Text(
-                text = movie.title,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // Bottom Info: Title & Year
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(8.dp)
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = movie.title,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 15.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = movie.year,
+                        color = Color.LightGray,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = movie.genre,
+                        color = Color(0xFF00A8E1),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }

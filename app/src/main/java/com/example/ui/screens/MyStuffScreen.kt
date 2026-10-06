@@ -241,7 +241,7 @@ fun MyStuffScreen(
                 }
             }
 
-            // 5. MACOS INSTALLATION CARD
+            // 5. MACOS INSTALLATION CARD (.DMG)
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF0F223D)),
@@ -255,13 +255,13 @@ fun MyStuffScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Instalar PrimePlex en macOS",
+                                    text = "Instalador .DMG para macOS",
                                     color = Color.White,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "MacBook, iMac y Mac mini (Apple Silicon M1/M2/M3/M4 e Intel)",
+                                    text = "PrimePlex-macOS.dmg (MacBook, iMac, Mac mini)",
                                     color = Color(0xFF00A8E1),
                                     fontSize = 11.sp
                                 )
@@ -271,9 +271,9 @@ fun MyStuffScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "Tienes 2 opciones para instalar y usar PrimePlex en tu Mac con la mejor experiencia:\n" +
-                                    "1. Como App nativa en tu Dock de macOS (Safari o Chrome).\n" +
-                                    "2. Instalando el paquete APK en macOS mediante emulador nativo.",
+                            text = "Se ha generado el instalador oficial 'PrimePlex-macOS.dmg' para instalar la aplicación directamente en tu Mac sin emuladores:\n" +
+                                    "• Paquete instalador de disco Apple (.dmg) con PrimePlex.app.\n" +
+                                    "• Compatible con macOS Sonoma, Ventura, Monterey (chips M1, M2, M3, M4 e Intel).",
                             color = Color.LightGray,
                             fontSize = 12.sp,
                             lineHeight = 18.sp
@@ -293,7 +293,7 @@ fun MyStuffScreen(
                             ) {
                                 Icon(Icons.Default.Info, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ver Guía Paso a Paso", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Instalación .DMG en Mac", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
 
                             OutlinedButton(
@@ -307,7 +307,7 @@ fun MyStuffScreen(
                             ) {
                                 Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copiar Enlace Mac", color = Color.White, fontSize = 12.sp)
+                                Text("Copiar Enlace Web", color = Color.White, fontSize = 12.sp)
                             }
                         }
                     }
@@ -353,7 +353,7 @@ fun MyStuffScreen(
                         Text("🍏", fontSize = 24.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Cómo instalar PrimePlex en macOS",
+                            text = "Instalador PrimePlex para macOS (.DMG)",
                             color = Color.White,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
@@ -372,18 +372,19 @@ fun MyStuffScreen(
                             color = Color(0xFF00A8E1).copy(alpha = 0.15f),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "⭐ MÉTODO 1 (Más Rápido): App en el Dock de Mac",
+                                    text = "💾 INSTALACIÓN CON 'PrimePlex-macOS.dmg'",
                                     color = Color(0xFF00A8E1),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "Convierte la app en una aplicación nativa de macOS integrada con el Dock y la barra de menús:\n\n" +
-                                            "• En Safari (macOS Sonoma 14+): Abre el enlace de la app y ve a Archivo > Añadir al Dock (Add to Dock). Tendrás el icono de PrimePlex en tu Dock y en la carpeta /Aplicaciones de tu Mac.\n\n" +
-                                            "• En Google Chrome: Abre el enlace, haz clic en el icono de 'Instalar PrimePlex' en la barra de direcciones (o Menú > Guardar y compartir > Instalar PrimePlex como ventana).",
+                                    text = "1. El archivo 'PrimePlex-macOS.dmg' está generado en la raíz de tu proyecto.\n\n" +
+                                            "2. En tu Mac, haz doble clic sobre 'PrimePlex-macOS.dmg'. Se montará una ventana de instalación con el icono de PrimePlex y la carpeta Aplicaciones.\n\n" +
+                                            "3. Arrastra 'PrimePlex.app' hacia 'Applications' (Aplicaciones).\n\n" +
+                                            "4. ¡Listo! Ya tienes la app instalada en tu Mac. Puedes abrirla desde Launchpad o Spotlight directamente sin necesidad de emuladores.",
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     lineHeight = 17.sp
@@ -396,22 +397,17 @@ fun MyStuffScreen(
                             color = Color(0xFF1E2E4A),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "📦 MÉTODO 2: Instalar el paquete APK en Mac",
+                                    text = "🚀 ALTERNATIVA DIRECTA: AÑADIR AL DOCK DE MAC",
                                     color = Color(0xFFFF9900),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "Si prefieres el ejecutable APK en tu Mac:\n\n" +
-                                            "1. Descarga el APK desde el menú superior de Google AI Studio (botón de exportar / generar APK).\n" +
-                                            "2. En macOS (Apple Silicon M1/M2/M3/M4 o Intel), puedes abrir e instalar el APK con:\n" +
-                                            "   • Android Studio para Mac (Emulador oficial de Google).\n" +
-                                            "   • MuMuPlayer Pro para Mac (altamente optimizado para macOS).\n" +
-                                            "   • BlueStacks para Mac.\n" +
-                                            "3. Arrastra el archivo APK a la ventana y se instalará automáticamente con aceleración gráfica completa.",
+                                    text = "Si prefieres tenerla instalada en 1 solo clic en tu Mac sin descargar archivos:\n\n" +
+                                            "• En Safari (macOS): Abre el enlace de PrimePlex y haz clic en Archivo > 'Añadir al Dock'. Se creará una app nativa en tu Dock al instante.",
                                     color = Color.LightGray,
                                     fontSize = 12.sp,
                                     lineHeight = 17.sp
@@ -430,7 +426,7 @@ fun MyStuffScreen(
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Copiar Enlace Web para Safari/Chrome", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Copiar Enlace Web para Safari en Mac", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 },

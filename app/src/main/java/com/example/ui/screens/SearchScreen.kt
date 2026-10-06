@@ -66,9 +66,9 @@ fun SearchScreen(
             .padding(16.dp)
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 160.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            columns = GridCells.Adaptive(minSize = 135.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             // Header search controls
@@ -187,7 +187,7 @@ fun SearchScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp)
+                            .height(210.dp)
                             .tvFocusable(
                                 shape = RoundedCornerShape(8.dp),
                                 focusedBorderColor = Color(0xFF00A8E1),
