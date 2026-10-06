@@ -40,7 +40,13 @@ fun MyStuffScreen(
     val clipboardManager = LocalClipboardManager.current
     var showMacDialog by remember { mutableStateOf(false) }
 
+    var showAddProfileDialog by remember { mutableStateOf(false) }
+    var newProfileName by remember { mutableStateOf("") }
+    var selectedColorIndex by remember { mutableStateOf(0) }
+    var isKidProfile by remember { mutableStateOf(false) }
+
     val activeProfile by viewModel.currentProfile.collectAsState()
+    val userProfiles by viewModel.profiles.collectAsState()
     val currentUserAccount by viewModel.currentUserAccount.collectAsState()
     val isAdmin by viewModel.isAdmin.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
@@ -131,6 +137,109 @@ fun MyStuffScreen(
                                 contentDescription = "Cerrar Sesión / Cambiar Cuenta",
                                 tint = Color(0xFFFF6B6B)
                             )
+                        }
+                    }
+                }
+            }
+
+            // 1.5 PERFILES DE MI CUENTA (Múltiples perfiles por usuario)
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1E36)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("user_profiles_section")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Perfiles de mi Cuenta",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${userProfiles.size} perfil${if (userProfiles.size != 1) "es" else ""} disponible${if (userProfiles.size != 1) "s" else ""}",
+                                    color = Color.LightGray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    newProfileName = ""
+                                    selectedColorIndex = userProfiles.size % AvatarColors.size
+                                    isKidProfile = false
+                                    showAddProfileDialog = true
+                                }
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF00A8E1), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Crear Perfil", color = Color(0xFF00A8E1), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(userProfiles) { p ->
+                                val pColor = AvatarColors.getOrElse(p.avatarColorIndex) { AvatarColors[0] }
+                                val isSelected = p.id == profileNonNull.id
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) Color(0xFF00A8E1).copy(alpha = 0.2f) else Color(0xFF1E2E4A),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) Color(0xFF00A8E1) else Color.Transparent
+                                    ),
+                                    modifier = Modifier
+                                        .clickable { viewModel.selectProfile(p) }
+                                        .tvFocusable(shape = RoundedCornerShape(10.dp))
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(pColor),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = p.name.take(1).uppercase(),
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = p.name,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (isSelected) {
+                                                Text(
+                                                    text = "Activo",
+                                                    color = Color(0xFF00A8E1),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -439,6 +548,59 @@ fun MyStuffScreen(
                     }
                 },
                 containerColor = Color(0xFF0A182E)
+            )
+        }
+
+        if (showAddProfileDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddProfileDialog = false },
+                title = { Text("Crear Nuevo Perfil", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Introduce un nombre para el nuevo perfil:", color = Color.LightGray, fontSize = 13.sp)
+                        OutlinedTextField(
+                            value = newProfileName,
+                            onValueChange = { newProfileName = it },
+                            placeholder = { Text("Nombre (ej. Niños, Ana...)", color = Color.Gray) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF1E2E4A),
+                                unfocusedContainerColor = Color(0xFF1E2E4A),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = isKidProfile,
+                                onCheckedChange = { isKidProfile = it },
+                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFF00A8E1))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Perfil infantil (Contenido familiar)", color = Color.LightGray, fontSize = 12.sp)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newProfileName.trim().isNotBlank()) {
+                                viewModel.createProfile(newProfileName.trim(), selectedColorIndex, isKidProfile)
+                                Toast.makeText(context, "Perfil \"${newProfileName.trim()}\" creado", Toast.LENGTH_SHORT).show()
+                                showAddProfileDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1))
+                    ) {
+                        Text("Crear", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddProfileDialog = false }) {
+                        Text("Cancelar", color = Color.LightGray)
+                    }
+                },
+                containerColor = Color(0xFF0F1E36)
             )
         }
     }

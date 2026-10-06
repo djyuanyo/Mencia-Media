@@ -8,6 +8,7 @@ import org.json.JSONObject
 @Entity(tableName = "profiles")
 data class Profile(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: Int = 0, // Links to UserAccount.id so each user has multiple separate profiles
     val name: String,
     val avatarColorIndex: Int = 0, // Index representing selected profile avatar color
     val isKid: Boolean = false,
@@ -21,6 +22,7 @@ data class UserAccount(
     val password: String,
     val name: String,
     val isAdmin: Boolean = false,
+    val isApproved: Boolean = false, // Must be approved by administrator before gaining access
     val createdAt: Long = System.currentTimeMillis()
 )
 

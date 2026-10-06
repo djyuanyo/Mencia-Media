@@ -51,6 +51,7 @@ fun AuthScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showPendingApprovalDialog by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
 
@@ -75,17 +76,59 @@ fun AuthScreen(
             }
 
             isLoading = false
-            result.onSuccess {
-                Toast.makeText(
-                    context,
-                    if (it.isAdmin) "¡Bienvenido Administrador ${it.name}!" else "¡Bienvenido ${it.name}!",
-                    Toast.LENGTH_SHORT
-                ).show()
-                onAuthSuccess()
+            result.onSuccess { user ->
+                if (isRegisterMode && !user.isAdmin && !user.isApproved) {
+                    // Non-admin user registered: requires administrator approval before accessing
+                    showPendingApprovalDialog = true
+                    isRegisterMode = false
+                    password = ""
+                } else {
+                    Toast.makeText(
+                        context,
+                        if (user.isAdmin) "¡Bienvenido Administrador ${user.name}!" else "¡Bienvenido ${user.name}!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onAuthSuccess()
+                }
             }.onFailure { err ->
-                errorMessage = err.message ?: "Error en la autenticación"
+                val rawMsg = err.message ?: "Error en la autenticación"
+                errorMessage = if (rawMsg.contains("PENDING_APPROVAL", ignoreCase = true) || rawMsg.contains("pendiente de aprobación", ignoreCase = true)) {
+                    "⏳ Tu cuenta está pendiente de aprobación por el administrador (juanjocarrillo7@gmail.com). El administrador debe activar tu cuenta antes de que puedas acceder."
+                } else {
+                    rawMsg
+                }
             }
         }
+    }
+
+    if (showPendingApprovalDialog) {
+        AlertDialog(
+            onDismissRequest = { showPendingApprovalDialog = false },
+            title = {
+                Text(
+                    text = "⏳ Registro Pendiente de Aprobación",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "¡Tu cuenta ha sido creada con éxito!\n\nPor políticas de la plataforma, un administrador debe activar tu usuario antes de que puedas acceder al catálogo.\n\nEl administrador revisará tu solicitud para activar tu cuenta.",
+                    color = Color.LightGray,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showPendingApprovalDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8E1))
+                ) {
+                    Text("Entendido", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = Color(0xFF0F1E36)
+        )
     }
 
     Box(
@@ -210,58 +253,6 @@ fun AuthScreen(
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(vertical = 10.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 1-TAP QUICK ADMIN BUTTON
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF2BAD3B).copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2BAD3B).copy(alpha = 0.5f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tvFocusable(shape = RoundedCornerShape(10.dp))
-                    .clickable {
-                        email = "juanjocarrillo7@gmail.com"
-                        password = "Menciano15"
-                        isRegisterMode = false
-                        errorMessage = null
-                        performSubmit()
-                    }
-                    .testTag("quick_admin_login_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = Color(0xFF2BAD3B),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Acceso Rápido: Administrador",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "juanjocarrillo7@gmail.com (Menciano15)",
-                            color = Color(0xFF2BAD3B),
-                            fontSize = 11.sp
-                        )
-                    }
-                    Icon(
-                        Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -396,15 +387,16 @@ fun AuthScreen(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "ℹ️ Información de Permisos:",
+                        text = "ℹ️ Acceso y Control de la Plataforma:",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "• Solo el Administrador (juanjocarrillo7@gmail.com) puede añadir, editar o eliminar títulos de la biblioteca.\n" +
-                                "• El resto de usuarios registrados pueden ver y reproducir todo el catálogo sin la opción de añadir.",
+                        text = "• Administrador: Accede introduciendo su usuario (juanjocarrillo7@gmail.com) y contraseña para gestionar la biblioteca y activar o eliminar cuentas.\n" +
+                                "• Nuevos Usuarios: Al registrarte, tu cuenta quedará pendiente de aprobación. No podrás acceder hasta que el administrador la active.\n" +
+                                "• Perfiles: Cada usuario registrado puede crear y gestionar varios perfiles personalizados e independientes dentro de su cuenta.",
                         color = Color.LightGray,
                         fontSize = 11.sp,
                         lineHeight = 16.sp

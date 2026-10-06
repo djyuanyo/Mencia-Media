@@ -30,6 +30,7 @@ enum class MainTab {
     INICIO,
     BUSCAR,
     SUBIR,
+    USUARIOS,
     MI_ESPACIO
 }
 
@@ -48,7 +49,7 @@ fun MainHubScreen(
     val isAdmin by viewModel.isAdmin.collectAsState()
 
     LaunchedEffect(isAdmin) {
-        if (!isAdmin && activeTab == MainTab.SUBIR) {
+        if (!isAdmin && (activeTab == MainTab.SUBIR || activeTab == MainTab.USUARIOS)) {
             activeTab = MainTab.INICIO
         }
     }
@@ -176,6 +177,25 @@ fun MainHubScreen(
                                 .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.1f)
                                 .testTag("nav_rail_subir")
                         )
+
+                        // Gestión de Usuarios Tab (SOLO ADMINISTRADOR)
+                        NavigationRailItem(
+                            selected = activeTab == MainTab.USUARIOS,
+                            onClick = { activeTab = MainTab.USUARIOS },
+                            icon = { Icon(Icons.Default.Person, contentDescription = "Usuarios") },
+                            label = { Text("Usuarios", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = Color(0xFF00A8E1),
+                                selectedTextColor = Color(0xFF00A8E1),
+                                indicatorColor = Color(0xFF09111E),
+                                unselectedIconColor = Color.LightGray,
+                                unselectedTextColor = Color.LightGray
+                            ),
+                            modifier = Modifier
+                                .padding(vertical = 4.dp, horizontal = 8.dp)
+                                .tvFocusable(shape = RoundedCornerShape(8.dp), focusedScale = 1.1f)
+                                .testTag("nav_rail_usuarios")
+                        )
                     }
 
                     // Mi Espacio Tab
@@ -255,6 +275,9 @@ fun MainHubScreen(
                         MainTab.SUBIR -> AddMovieScreen(
                             viewModel = viewModel,
                             onMovieSaved = { activeTab = MainTab.INICIO }
+                        )
+                        MainTab.USUARIOS -> UserManagementScreen(
+                            viewModel = viewModel
                         )
                         MainTab.MI_ESPACIO -> MyStuffScreen(
                             viewModel = viewModel,
@@ -380,6 +403,24 @@ fun MainHubScreen(
                                     .tvFocusable(shape = RoundedCornerShape(8.dp))
                                     .testTag("nav_item_subir")
                             )
+
+                            // Gestión de Usuarios Tab (SOLO ADMINISTRADOR)
+                            NavigationBarItem(
+                                selected = activeTab == MainTab.USUARIOS,
+                                onClick = { activeTab = MainTab.USUARIOS },
+                                label = { Text("Usuarios", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                                icon = { Icon(Icons.Default.Person, contentDescription = "Gestión de Usuarios") },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFF00A8E1),
+                                    selectedTextColor = Color(0xFF00A8E1),
+                                    indicatorColor = Color(0xFF09111E),
+                                    unselectedIconColor = Color.LightGray,
+                                    unselectedTextColor = Color.LightGray
+                                ),
+                                modifier = Modifier
+                                    .tvFocusable(shape = RoundedCornerShape(8.dp))
+                                    .testTag("nav_item_usuarios")
+                            )
                         }
 
                         NavigationBarItem(
@@ -419,6 +460,9 @@ fun MainHubScreen(
                         MainTab.SUBIR -> AddMovieScreen(
                             viewModel = viewModel,
                             onMovieSaved = { activeTab = MainTab.INICIO }
+                        )
+                        MainTab.USUARIOS -> UserManagementScreen(
+                            viewModel = viewModel
                         )
                         MainTab.MI_ESPACIO -> MyStuffScreen(
                             viewModel = viewModel,

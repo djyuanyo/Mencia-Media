@@ -74,9 +74,32 @@ class MovieViewModel(
         user != null && (user.isAdmin || user.email.equals("juanjocarrillo7@gmail.com", ignoreCase = true))
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    // All available profiles
-    val profiles = repository.allProfiles
+    // All available profiles for currently active user account (each user has their own profiles)
+    val profiles: StateFlow<List<Profile>> = _currentUserAccount
+        .flatMapLatest { user ->
+            if (user != null) {
+                repository.getProfilesForUser(user.id)
+            } else {
+                flowOf(emptyList())
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // All registered users for administrator management
+    val allUsers: StateFlow<List<UserAccount>> = repository.allUsers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun approveUser(userId: Int, approved: Boolean) {
+        viewModelScope.launch {
+            repository.setUserApproval(userId, approved)
+        }
+    }
+
+    fun deleteUser(user: UserAccount) {
+        viewModelScope.launch {
+            repository.deleteUser(user)
+        }
+    }
 
     // Currently active/logged profile
     private val _currentProfile = MutableStateFlow<Profile?>(null)
@@ -170,9 +193,11 @@ class MovieViewModel(
     }
 
     fun createProfile(name: String, avatarColorIndex: Int, isKid: Boolean) {
+        val currentUserId = _currentUserAccount.value?.id ?: 0
         viewModelScope.launch {
             repository.insertProfile(
                 Profile(
+                    userId = currentUserId,
                     name = name,
                     avatarColorIndex = avatarColorIndex,
                     isKid = isKid
@@ -264,17 +289,15 @@ class MovieViewModel(
             val user = repository.authenticateUser(email, password)
             if (user != null) {
                 _currentUserAccount.value = user
-                // Link or create a profile matching user name
-                val currentProfiles = repository.allProfiles.first()
-                val matched = currentProfiles.find { it.name.equals(user.name, ignoreCase = true) }
-                if (matched != null) {
-                    _currentProfile.value = matched
-                } else if (currentProfiles.isNotEmpty()) {
-                    _currentProfile.value = currentProfiles.first()
+                // Link or create a profile matching user name for their account
+                val userProfiles = repository.getProfilesForUser(user.id).first()
+                if (userProfiles.isNotEmpty()) {
+                    val matched = userProfiles.find { it.name.equals(user.name, ignoreCase = true) }
+                    _currentProfile.value = matched ?: userProfiles.first()
                 } else {
-                    val newProfile = Profile(name = user.name, avatarColorIndex = 0, isKid = false)
-                    repository.insertProfile(newProfile)
-                    _currentProfile.value = newProfile
+                    val newProfile = Profile(userId = user.id, name = user.name, avatarColorIndex = 0, isKid = false)
+                    val id = repository.insertProfile(newProfile)
+                    _currentProfile.value = newProfile.copy(id = id.toInt())
                 }
                 Result.success(user)
             } else {
@@ -288,10 +311,12 @@ class MovieViewModel(
     suspend fun register(email: String, password: String, name: String): Result<UserAccount> {
         return try {
             val user = repository.registerUser(email, password, name)
-            _currentUserAccount.value = user
-            val newProfile = Profile(name = user.name, avatarColorIndex = 0, isKid = false)
-            repository.insertProfile(newProfile)
-            _currentProfile.value = newProfile
+            // If admin or already approved, set as current user; otherwise leave unauthenticated
+            if (user.isAdmin || user.isApproved) {
+                _currentUserAccount.value = user
+                val userProfiles = repository.getProfilesForUser(user.id).first()
+                _currentProfile.value = userProfiles.firstOrNull()
+            }
             Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)

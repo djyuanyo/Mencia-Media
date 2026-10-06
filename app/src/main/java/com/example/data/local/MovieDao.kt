@@ -21,7 +21,19 @@ interface MovieDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: UserAccount): Long
 
-    @Query("SELECT * FROM user_accounts ORDER BY createdAt ASC")
+    @Update
+    suspend fun updateUser(user: UserAccount)
+
+    @Delete
+    suspend fun deleteUser(user: UserAccount)
+
+    @Query("DELETE FROM user_accounts WHERE id = :userId")
+    suspend fun deleteUserById(userId: Int)
+
+    @Query("UPDATE user_accounts SET isApproved = :approved WHERE id = :userId")
+    suspend fun setUserApproval(userId: Int, approved: Boolean)
+
+    @Query("SELECT * FROM user_accounts ORDER BY createdAt DESC")
     fun getAllUsers(): Flow<List<UserAccount>>
 
     @Query("SELECT COUNT(*) FROM user_accounts")
@@ -30,6 +42,12 @@ interface MovieDao {
     // --- PROFILES ---
     @Query("SELECT * FROM profiles ORDER BY createdAt ASC")
     fun getAllProfiles(): Flow<List<Profile>>
+
+    @Query("SELECT * FROM profiles WHERE userId = :userId ORDER BY createdAt ASC")
+    fun getProfilesForUser(userId: Int): Flow<List<Profile>>
+
+    @Query("DELETE FROM profiles WHERE userId = :userId")
+    suspend fun deleteProfilesForUser(userId: Int)
 
     @Query("SELECT * FROM profiles WHERE id = :id LIMIT 1")
     suspend fun getProfileById(id: Int): Profile?

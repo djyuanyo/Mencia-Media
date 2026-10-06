@@ -135,6 +135,15 @@ class MovieRepository(
 
     suspend fun getUserByEmail(email: String): UserAccount? = movieDao.getUserByEmailDirect(email.trim())
 
+    suspend fun setUserApproval(userId: Int, approved: Boolean) = movieDao.setUserApproval(userId, approved)
+
+    suspend fun deleteUser(user: UserAccount) {
+        movieDao.deleteUser(user)
+        movieDao.deleteProfilesForUser(user.id)
+    }
+
+    fun getProfilesForUser(userId: Int): Flow<List<Profile>> = movieDao.getProfilesForUser(userId)
+
     suspend fun authenticateUser(email: String, password: String): UserAccount? {
         val cleanEmail = email.trim()
         val cleanPassword = password.trim()
@@ -146,14 +155,27 @@ class MovieRepository(
                     email = "juanjocarrillo7@gmail.com",
                     password = "Menciano15",
                     name = "Juan José (Admin)",
-                    isAdmin = true
+                    isAdmin = true,
+                    isApproved = true
                 )
                 val id = movieDao.insertUser(adminUser)
                 admin = adminUser.copy(id = id.toInt())
+            } else if (!admin.isApproved || !admin.isAdmin) {
+                val updatedAdmin = admin.copy(isAdmin = true, isApproved = true)
+                movieDao.updateUser(updatedAdmin)
+                admin = updatedAdmin
             }
             return admin
         }
-        return movieDao.authenticateUser(cleanEmail, cleanPassword)
+
+        val user = movieDao.authenticateUser(cleanEmail, cleanPassword) ?: return null
+
+        // Enforce administrator approval check
+        if (!user.isApproved && !user.isAdmin) {
+            throw IllegalStateException("PENDING_APPROVAL: Tu cuenta está pendiente de aprobación por el administrador (juanjocarrillo7@gmail.com). Podrás acceder una vez sea activada.")
+        }
+
+        return user
     }
 
     suspend fun registerUser(email: String, password: String, name: String): UserAccount {
@@ -161,6 +183,7 @@ class MovieRepository(
         val cleanPassword = password.trim()
         val cleanName = name.trim().ifEmpty { cleanEmail.substringBefore("@") }
         val isAdmin = cleanEmail.equals("juanjocarrillo7@gmail.com", ignoreCase = true)
+        val isApproved = isAdmin // Non-admin accounts require admin approval
 
         val existing = movieDao.getUserByEmailDirect(cleanEmail)
         if (existing != null) {
@@ -171,10 +194,23 @@ class MovieRepository(
             email = cleanEmail,
             password = cleanPassword,
             name = cleanName,
-            isAdmin = isAdmin
+            isAdmin = isAdmin,
+            isApproved = isApproved
         )
         val id = movieDao.insertUser(newUser)
-        return newUser.copy(id = id.toInt())
+        val userWithId = newUser.copy(id = id.toInt())
+
+        // Create initial default profile for this user
+        movieDao.insertProfile(
+            Profile(
+                userId = userWithId.id,
+                name = cleanName,
+                avatarColorIndex = 0,
+                isKid = false
+            )
+        )
+
+        return userWithId
     }
 
     fun getWatchlistForProfile(profileId: Int): Flow<List<Movie>> = movieDao.getWatchlistForProfile(profileId)
@@ -223,23 +259,28 @@ class MovieRepository(
     suspend fun prepopulateIfNeeded() {
         // Pre-seed official admin user
         val existingAdmin = movieDao.getUserByEmailDirect("juanjocarrillo7@gmail.com")
-        if (existingAdmin == null) {
-            movieDao.insertUser(
-                UserAccount(
-                    email = "juanjocarrillo7@gmail.com",
-                    password = "Menciano15",
-                    name = "Juan José (Admin)",
-                    isAdmin = true
-                )
+        val adminId: Int = if (existingAdmin == null) {
+            val adminUser = UserAccount(
+                email = "juanjocarrillo7@gmail.com",
+                password = "Menciano15",
+                name = "Juan José (Admin)",
+                isAdmin = true,
+                isApproved = true
             )
+            movieDao.insertUser(adminUser).toInt()
+        } else {
+            if (!existingAdmin.isAdmin || !existingAdmin.isApproved) {
+                movieDao.updateUser(existingAdmin.copy(isAdmin = true, isApproved = true))
+            }
+            existingAdmin.id
         }
 
         val existingProfiles = allProfiles.first()
         if (existingProfiles.isEmpty()) {
-            movieDao.insertProfile(Profile(name = "Juan (Admin)", avatarColorIndex = 0, isKid = false))
-            movieDao.insertProfile(Profile(name = "Mamá", avatarColorIndex = 1, isKid = false))
-            movieDao.insertProfile(Profile(name = "Invitado", avatarColorIndex = 2, isKid = false))
-            movieDao.insertProfile(Profile(name = "Niños", avatarColorIndex = 3, isKid = true))
+            movieDao.insertProfile(Profile(userId = adminId, name = "Juan (Admin)", avatarColorIndex = 0, isKid = false))
+            movieDao.insertProfile(Profile(userId = adminId, name = "Mamá", avatarColorIndex = 1, isKid = false))
+            movieDao.insertProfile(Profile(userId = adminId, name = "Invitado", avatarColorIndex = 2, isKid = false))
+            movieDao.insertProfile(Profile(userId = adminId, name = "Niños", avatarColorIndex = 3, isKid = true))
         }
 
         // 1. Synchronize with global cloud catalog to fetch titles published by any user/admin
