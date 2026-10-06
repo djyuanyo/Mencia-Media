@@ -1,0 +1,15 @@
+#!/bin/bash
+APP_URL="https://ais-pre-5fs77qi7v7kfvi54tjkqds-42077592416.europe-west2.run.app"
+
+if [ -d "/Applications/Google Chrome.app" ]; then
+    nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
+elif [ -d "$HOME/Applications/Google Chrome.app" ]; then
+    nohup "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
+elif [ -d "/Applications/Brave Browser.app" ]; then
+    nohup "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
+elif [ -d "/Applications/Microsoft Edge.app" ]; then
+    nohup "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
+else
+    open "$APP_URL"
+fi
+exit 0

@@ -65,7 +65,14 @@ jobs:
           path: release-apk/PrimePlex-debug.apk
           retention-days: 30
 
-      - name: Publicar Release en GitHub con el archivo APK
+      - name: Subir artefacto macOS DMG para descarga directa
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimePlex-macOS-DMG
+          path: PrimePlex-macOS.dmg
+          retention-days: 30
+
+      - name: Publicar Release en GitHub con APK y DMG macOS
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         continue-on-error: true
@@ -73,12 +80,16 @@ jobs:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "PrimePlex v1.0.${{ github.run_number }}"
           body: |
-            ### 🎬 PrimePlex Android APK
+            ### 🎬 PrimePlex - Versión Oficial Multiplataforma
             Versión generada automáticamente desde el código fuente del proyecto (Build #${{ github.run_number }}).
 
-            **Descarga:**
-            * Haz clic en `PrimePlex-debug.apk` abajo para descargar e instalar en tu dispositivo Android.
-          files: release-apk/PrimePlex-debug.apk
+            **📥 Descargas oficiales:**
+            * 🍏 **macOS:** Haz clic en `PrimePlex-macOS.dmg` abajo para instalar directamente en Mac (Apple Silicon M1/M2/M3/M4 o Intel) sin emuladores.
+            * 📱 **Android:** Haz clic en `PrimePlex-debug.apk` abajo para instalar en tu dispositivo Android o Android TV.
+          files: |
+            release-apk/PrimePlex-debug.apk
+            PrimePlex-macOS.dmg
+            PrimePlex-macOS.zip
           prerelease: false
           make_latest: true
         env:

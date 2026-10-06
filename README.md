@@ -4,7 +4,20 @@ Aplicación de streaming y catálogo cinematográfico estilo **Plex TV** con int
 
 ---
 
-## 📥 Cómo descargar e instalar el archivo APK desde GitHub
+## 🍏 Instalador Oficial para macOS (.DMG)
+
+Puedes instalar PrimePlex directamente en tu Mac (compatible con **Apple Silicon M1, M2, M3, M4** e **Intel**):
+
+1. **Descarga directa desde este repositorio de GitHub:**
+   * 👉 Haz clic en [**`PrimePlex-macOS.dmg`**](./PrimePlex-macOS.dmg) en la lista de archivos de este repositorio y pulsa **Download** (o en la carpeta [`macos/PrimePlex-macOS.dmg`](./macos/PrimePlex-macOS.dmg)).
+2. **Instalación en Mac:**
+   * Haz doble clic sobre el archivo `PrimePlex-macOS.dmg` descargado.
+   * Arrastra el icono **PrimePlex** hacia la carpeta **Applications** (Aplicaciones).
+   * ¡Listo! Ya tienes la app instalada en tu Mac sin necesidad de ningún emulador.
+
+---
+
+## 📱 Cómo descargar e instalar el archivo APK para Android desde GitHub
 
 Tienes **3 formas sencillas** de obtener el archivo `.apk`:
 
