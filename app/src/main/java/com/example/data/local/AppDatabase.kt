@@ -104,7 +104,21 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigrationOnDowngrade(false)
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        super.onOpen(db)
+                        try {
+                            db.execSQL("ALTER TABLE movies ADD COLUMN trailerUrl TEXT NOT NULL DEFAULT ''")
+                        } catch (_: Exception) {}
+                        try {
+                            db.execSQL("ALTER TABLE user_accounts ADD COLUMN isApproved INTEGER NOT NULL DEFAULT 1")
+                        } catch (_: Exception) {}
+                        try {
+                            db.execSQL("ALTER TABLE profiles ADD COLUMN userId INTEGER NOT NULL DEFAULT 0")
+                        } catch (_: Exception) {}
+                    }
+                })
                 .build()
                 INSTANCE = instance
                 instance

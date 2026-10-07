@@ -521,7 +521,7 @@ private fun UserCardItem(
             // ACTIONS (Only for non-admin accounts)
             if (!user.isAdmin) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = Color(0xFF1E2E4A), thickness = 0.8.dp)
+                HorizontalDivider(color = Color(0xFF1E2E4A), thickness = 0.8.dp)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(

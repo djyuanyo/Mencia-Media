@@ -444,7 +444,7 @@ fun AddMovieScreen(
                                                     .background(Color(0xFF0A182E)),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Icon(Icons.Default.Movie, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
                                             }
                                         }
 

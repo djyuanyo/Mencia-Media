@@ -1,0 +1,15 @@
+=============================================================
+🎬 PRIMEPLEX PARA MACOS (APPLE SILICON & INTEL)
+=============================================================
+
+Para usar PrimePlex en tu Mac:
+
+OPCIÓN 1 (Recomendada):
+Haz doble clic sobre 'Instalar-PrimePlex.command'.
+Se instalará automáticamente en tu carpeta Aplicaciones y se abrirá.
+
+OPCIÓN 2:
+Arrastra 'PrimePlex.app' a la carpeta 'Applications' (Aplicaciones).
+Luego haz doble clic para abrir PrimePlex.
+
+¡Disfruta de tus películas, series y enlaces de streaming en macOS!

@@ -1,15 +1,26 @@
 #!/bin/bash
-APP_URL="https://ais-pre-5fs77qi7v7kfvi54tjkqds-42077592416.europe-west2.run.app"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+HTML_PATH="$DIR/../Resources/app/index.html"
 
-if [ -d "/Applications/Google Chrome.app" ]; then
-    nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
-elif [ -d "$HOME/Applications/Google Chrome.app" ]; then
-    nohup "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
-elif [ -d "/Applications/Brave Browser.app" ]; then
-    nohup "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
-elif [ -d "/Applications/Microsoft Edge.app" ]; then
-    nohup "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" --app="$APP_URL" --window-size=1280,800 >/dev/null 2>&1 &
-else
-    open "$APP_URL"
+if [ ! -f "$HTML_PATH" ]; then
+    HTML_PATH="$DIR/../Resources/index.html"
 fi
+
+# Remove quarantine attribute to avoid Gatekeeper silent blocks
+xattr -d com.apple.quarantine "$DIR/../.." 2>/dev/null || true
+
+# Try opening in dedicated app mode if Chrome, Brave or Edge is available
+if [ -d "/Applications/Google Chrome.app" ]; then
+    open -na "Google Chrome" --args --app="file://$HTML_PATH" --window-size=1280,820 2>/dev/null || open "$HTML_PATH"
+elif [ -d "$HOME/Applications/Google Chrome.app" ]; then
+    open -na "$HOME/Applications/Google Chrome.app" --args --app="file://$HTML_PATH" --window-size=1280,820 2>/dev/null || open "$HTML_PATH"
+elif [ -d "/Applications/Brave Browser.app" ]; then
+    open -na "Brave Browser" --args --app="file://$HTML_PATH" --window-size=1280,820 2>/dev/null || open "$HTML_PATH"
+elif [ -d "/Applications/Microsoft Edge.app" ]; then
+    open -na "Microsoft Edge" --args --app="file://$HTML_PATH" --window-size=1280,820 2>/dev/null || open "$HTML_PATH"
+else
+    # Fallback to default browser (Safari, Firefox, etc.)
+    open "$HTML_PATH"
+fi
+
 exit 0

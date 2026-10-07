@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrimePlex - Streaming & Catálogo Multimedia</title>
+  <style>
+    :root {
+      --bg-dark: #0A182E;
+      --bg-card: #0F223D;
+      --bg-card-hover: #1A3459;
+      --prime-blue: #00A8E1;
+      --prime-blue-hover: #008ec0;
+      --imdb-yellow: #F5C518;
+      --text-main: #FFFFFF;
+      --text-muted: #A0B2C6;
+      --accent-red: #E50914;
+      --accent-green: #2BAD3B;
+      --border-color: rgba(0, 168, 225, 0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+    
+    /* NAV BAR */
+    header {
+      background: linear-gradient(180deg, rgba(10,24,46,0.98) 0%, rgba(10,24,46,0.85) 100%);
+      backdrop-filter: blur(10px);
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 28px; border-bottom: 1px solid var(--border-color);
+    }
+    .logo-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .logo-title { font-size: 22px; font-weight: 800; color: #FFF; letter-spacing: -0.5px; }
+    .logo-title span { color: var(--prime-blue); }
+    .nav-tabs { display: flex; gap: 18px; margin-left: 24px; }
+    .nav-tab { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: color 0.2s; padding: 6px 10px; border-radius: 6px; }
+    .nav-tab:hover, .nav-tab.active { color: #FFF; background: rgba(255,255,255,0.08); }
+    .header-actions { display: flex; align-items: center; gap: 14px; }
+    .search-input {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 20px; padding: 6px 16px; color: #FFF; font-size: 13px; outline: none; width: 220px;
+    }
+    .search-input:focus { border-color: var(--prime-blue); }
+    .profile-badge {
+      display: flex; align-items: center; gap: 8px; background: rgba(0, 168, 225, 0.15);
+      border: 1px solid var(--prime-blue); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer;
+    }
+    
+    /* HERO BANNER */
+    .hero {
+      position: relative; height: 420px; background-size: cover; background-position: center;
+      display: flex; align-items: flex-end; padding: 40px 36px;
+      background-image: linear-gradient(180deg, rgba(10,24,46,0.2) 0%, rgba(10,24,46,0.95) 90%), url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1600&q=80');
+    }
+    .hero-content { max-width: 650px; z-index: 2; }
+    .hero-badge { display: inline-block; background: var(--prime-blue); color: #000; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; }
+    .hero-title { font-size: 38px; font-weight: 800; margin-bottom: 10px; text-shadow: 0 2px 10px rgba(0,0,0,0.7); }
+    .hero-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+    .imdb-pill { background: var(--imdb-yellow); color: #000; font-weight: 800; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+    .hero-desc { font-size: 14px; line-height: 1.5; color: #E0E8F0; margin-bottom: 20px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .hero-buttons { display: flex; gap: 12px; }
+    .btn {
+      padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+      border: none; display: flex; align-items: center; gap: 8px; transition: 0.2s;
+    }
+    .btn-primary { background: var(--prime-blue); color: #000; }
+    .btn-primary:hover { background: var(--prime-blue-hover); }
+    .btn-secondary { background: rgba(255,255,255,0.15); color: #FFF; backdrop-filter: blur(5px); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.25); }
+    .btn-danger { background: var(--accent-red); color: #FFF; }
+
+    /* CONTENT ROWS */
+    .main-container { padding: 24px 36px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 16px 0; }
+    .section-title { font-size: 20px; font-weight: 700; color: #FFF; }
+    .movies-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px;
+    }
+    .movie-card {
+      background: var(--bg-card); border-radius: 8px; overflow: hidden;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid rgba(255,255,255,0.06); position: relative;
+    }
+    .movie-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+      border-color: var(--prime-blue);
+    }
+    .poster-wrap {
+      width: 100%; aspect-ratio: 2/3; position: relative; overflow: hidden; background: #071120;
+    }
+    .poster-img { width: 100%; height: 100%; object-fit: cover; }
+    .card-info { padding: 10px; }
+    .card-title { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* VIDEO PLAYER MODAL */
+    .player-modal {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000;
+      flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+    }
+    .player-modal.open { display: flex; }
+    .player-header { width: 100%; max-width: 1000px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .player-title { font-size: 18px; font-weight: bold; }
+    .close-btn { background: none; border: none; color: #FFF; font-size: 28px; cursor: pointer; }
+    .video-container { width: 100%; max-width: 1000px; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.8); }
+    video { width: 100%; height: 100%; outline: none; }
+    
+    /* ADD MEDIA MODAL */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 500;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px;
+      padding: 24px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: bold; }
+    .form-control {
+      width: 100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 13px;
+    }
+    .form-control:focus { border-color: var(--prime-blue); outline: none; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div style="display: flex; align-items: center;">
+      <div class="logo-container" onclick="showTab('inicio')">
+        <span style="font-size: 24px;">🎬</span>
+        <div class="logo-title">Prime<span>Plex</span></div>
+      </div>
+      <nav class="nav-tabs">
+        <a class="nav-tab active" onclick="showTab('inicio')">Inicio</a>
+        <a class="nav-tab" onclick="showTab('peliculas')">Películas</a>
+        <a class="nav-tab" onclick="showTab('series')">Series</a>
+        <a class="nav-tab" onclick="openAddModal()">+ Añadir Contenido</a>
+      </nav>
+    </div>
+    <div class="header-actions">
+      <input type="text" class="search-input" id="search-input" placeholder="Buscar títulos o actores..." oninput="handleSearch(this.value)">
+      <div class="profile-badge">
+        <span>👤</span> <span id="user-display">Juan (Admin)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <div class="hero" id="hero-banner">
+    <div class="hero-content">
+      <span class="hero-badge">DESTACADO EN PRIMEPLEX</span>
+      <h1 class="hero-title" id="hero-title">Sintel</h1>
+      <div class="hero-meta">
+        <span class="imdb-pill">IMDb 8.2</span>
+        <span id="hero-year">2010</span>
+        <span id="hero-genre">Fantasía • Animación</span>
+        <span id="hero-duration">14 min</span>
+      </div>
+      <p class="hero-desc" id="hero-desc">
+        La tierna historia de una chica que rescata a un pequeño dragón. Cuando es secuestrado por una bestia colosal, Sintel se embarca en un viaje épico lleno de peligros y aventuras visuales espectaculares.
+      </p>
+      <div class="hero-buttons">
+        <button class="btn btn-primary" onclick="playCurrentHero()">
+          <span>▶</span> Reproducir Ahora
+        </button>
+        <button class="btn btn-secondary" onclick="openTrailer('https://www.youtube.com/watch?v=eYk2WzU6B20')">
+          <span>🎬</span> Ver Tráiler
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CATALOG -->
+  <div class="main-container">
+    <div class="section-header">
+      <h2 class="section-title">Películas Disponibles (Portadas Verticales)</h2>
+    </div>
+    <div class="movies-grid" id="movies-grid"></div>
+
+    <div class="section-header" style="margin-top: 36px;">
+      <h2 class="section-title">Series y Documentales</h2>
+    </div>
+    <div class="movies-grid" id="series-grid"></div>
+  </div>
+
+  <!-- VIDEO PLAYER MODAL -->
+  <div class="player-modal" id="player-modal">
+    <div class="player-header">
+      <div class="player-title" id="player-title">Reproduciendo...</div>
+      <button class="close-btn" onclick="closePlayer()">✕</button>
+    </div>
+    <div class="video-container">
+      <video id="main-video" controls autoplay></video>
+    </div>
+  </div>
+
+  <!-- ADD MEDIA MODAL -->
+  <div class="modal-backdrop" id="add-modal">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="font-size:18px; color:#FFF;">Añadir Película o Serie</h3>
+        <button class="close-btn" onclick="closeAddModal()" style="font-size:20px;">✕</button>
+      </div>
+      <div class="form-group">
+        <label>Tipo de Contenido</label>
+        <select class="form-control" id="add-type" onchange="toggleSeriesForm(this.value)">
+          <option value="Películas">Película</option>
+          <option value="Series">Serie</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Título (en español)</label>
+        <input type="text" class="form-control" id="add-title" placeholder="Ej: Interstellar">
+      </div>
+      <div class="form-group">
+        <label>URL de Vídeo (Google Drive o enlace MP4 directo)</label>
+        <input type="text" class="form-control" id="add-url" placeholder="https://drive.google.com/file/d/... o https://...mp4">
+      </div>
+      <div class="form-group">
+        <label>URL de Portada Vertical</label>
+        <input type="text" class="form-control" id="add-poster" placeholder="https://image.tmdb.org/t/p/w500/...">
+      </div>
+      <div class="form-group">
+        <label>Tráiler Oficial (YouTube)</label>
+        <input type="text" class="form-control" id="add-trailer" placeholder="https://www.youtube.com/watch?v=...">
+      </div>
+      <div class="form-group">
+        <label>Género</label>
+        <input type="text" class="form-control" id="add-genre" value="Acción">
+      </div>
+      <div class="form-group">
+        <label>Año</label>
+        <input type="text" class="form-control" id="add-year" value="2026">
+      </div>
+      <div class="form-group">
+        <label>Sinopsis</label>
+        <textarea class="form-control" id="add-desc" rows="3" placeholder="Resumen del argumento..."></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button class="btn btn-secondary" onclick="closeAddModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveNewMedia()">Guardar en Biblioteca</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Storage & State
+    const defaultCatalog = [
+      {
+        id: 1,
+        title: "Sintel",
+        category: "Películas",
+        genre: "Fantasía • Aventura",
+        year: "2010",
+        duration: "14 min",
+        rating: "8.2",
+        poster: "https://images.unsplash.com/photo-1547483238-f400e65ccd56?w=600&q=80",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+        trailer: "https://www.youtube.com/watch?v=eYk2WzU6B20",
+        description: "La tierna historia de una chica que rescata a un pequeño dragón y se embarca en un viaje épico."
+      },
+      {
+        id: 2,
+        title: "Tears of Steel",
+        category: "Películas",
+        genre: "Ciencia Ficción",
+        year: "2012",
+        duration: "12 min",
+        rating: "7.8",
+        poster: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&q=80",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+        trailer: "https://www.youtube.com/watch?v=R6MlUcmOul8",
+        description: "En un Londres distópico, un grupo de científicos y guerreros intentan rescatar el mundo del azote de robots."
+      },
+      {
+        id: 3,
+        title: "Big Buck Bunny",
+        category: "Películas",
+        genre: "Comedia • Animación",
+        year: "2008",
+        duration: "10 min",
+        rating: "8.0",
+        poster: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        trailer: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+        description: "Un conejo gigante se enfrenta a tres ardillas traviesas en una hilarante revancha en el bosque."
+      },
+      {
+        id: 4,
+        title: "Cosmos: Mundos Posibles",
+        category: "Series",
+        genre: "Documental • Espacio",
+        year: "2020",
+        duration: "3 episodios",
+        rating: "9.3",
+        poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        trailer: "https://www.youtube.com/watch?v=mXpeA_k8x8k",
+        description: "Una travesía monumental a través del espacio y el tiempo explorando los secretos del cosmos."
+      }
+    ];
+
+    function getCatalog() {
+      const stored = localStorage.getItem("primeplex_catalog");
+      return stored ? JSON.parse(stored) : defaultCatalog;
+    }
+
+    function saveCatalog(catalog) {
+      localStorage.setItem("primeplex_catalog", JSON.stringify(catalog));
+    }
+
+    function resolveVideoUrl(url) {
+      if (!url) return "";
+      if (url.includes("drive.google.com")) {
+        const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+        if (idMatch && idMatch[1]) {
+          return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+        }
+      }
+      return url;
+    }
+
+    function renderCatalog() {
+      const items = getCatalog();
+      const moviesGrid = document.getElementById("movies-grid");
+      const seriesGrid = document.getElementById("series-grid");
+      moviesGrid.innerHTML = "";
+      seriesGrid.innerHTML = "";
+
+      items.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "movie-card";
+        card.innerHTML = `
+          <div class="poster-wrap">
+            <img class="poster-img" src="${item.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80'}" alt="${item.title}">
+          </div>
+          <div class="card-info">
+            <div class="card-title">${item.title}</div>
+            <div class="card-meta">
+              <span>${item.year}</span>
+              <span class="imdb-pill">★ ${item.rating || '7.5'}</span>
+            </div>
+          </div>
+        `;
+        card.onclick = () => playMedia(item);
+
+        if (item.category === "Series") {
+          seriesGrid.appendChild(card);
+        } else {
+          moviesGrid.appendChild(card);
+        }
+      });
+    }
+
+    function playMedia(item) {
+      const resolved = resolveVideoUrl(item.videoUrl);
+      document.getElementById("player-title").innerText = `${item.title} (${item.year})`;
+      const video = document.getElementById("main-video");
+      video.src = resolved;
+      video.play().catch(e => console.log("Auto-play:", e));
+      document.getElementById("player-modal").classList.add("open");
+    }
+
+    function playCurrentHero() {
+      const catalog = getCatalog();
+      if (catalog.length > 0) playMedia(catalog[0]);
+    }
+
+    function closePlayer() {
+      const video = document.getElementById("main-video");
+      video.pause();
+      video.src = "";
+      document.getElementById("player-modal").classList.remove("open");
+    }
+
+    function openTrailer(url) {
+      if (url) window.open(url, "_blank");
+    }
+
+    function openAddModal() {
+      document.getElementById("add-modal").classList.add("open");
+    }
+
+    function closeAddModal() {
+      document.getElementById("add-modal").classList.remove("open");
+    }
+
+    function saveNewMedia() {
+      const title = document.getElementById("add-title").value.trim();
+      const videoUrl = document.getElementById("add-url").value.trim();
+      const poster = document.getElementById("add-poster").value.trim();
+      const trailer = document.getElementById("add-trailer").value.trim();
+      const genre = document.getElementById("add-genre").value.trim();
+      const year = document.getElementById("add-year").value.trim();
+      const category = document.getElementById("add-type").value;
+      const desc = document.getElementById("add-desc").value.trim();
+
+      if (!title) {
+        alert("Escribe un título para la película o serie.");
+        return;
+      }
+
+      const catalog = getCatalog();
+      catalog.push({
+        id: Date.now(),
+        title,
+        category,
+        genre,
+        year: year || "2026",
+        duration: "120 min",
+        rating: "8.0",
+        poster,
+        videoUrl,
+        trailer,
+        description: desc || "Añadido por el usuario."
+      });
+      saveCatalog(catalog);
+      closeAddModal();
+      renderCatalog();
+      alert(`" ${title} " guardada con éxito en la biblioteca.`);
+    }
+
+    function handleSearch(query) {
+      const q = query.toLowerCase();
+      document.querySelectorAll(".movie-card").forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(q) ? "block" : "none";
+      });
+    }
+
+    // Init
+    window.onload = () => {
+      renderCatalog();
+    };
+  </script>
+</body>
+</html>

@@ -26,7 +26,9 @@ jobs:
           java-version: '21'
 
       - name: Configurar Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
 
       - name: Preparar entorno y licencias
         run: |
@@ -51,7 +53,7 @@ jobs:
         run: chmod +x gradlew || true
 
       - name: Compilar APK (Debug)
-        run: ./gradlew assembleDebug --stacktrace -Pkotlin.compiler.execution.strategy=daemon
+        run: ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
 
       - name: Preparar APK
         run: |
@@ -71,6 +73,15 @@ jobs:
           name: PrimePlex-macOS-DMG
           path: PrimePlex-macOS.dmg
           retention-days: 30
+          if-no-files-found: warn
+
+      - name: Subir artefacto macOS ZIP para descarga directa
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimePlex-macOS-ZIP
+          path: PrimePlex-macOS.zip
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Publicar Release en GitHub con APK y DMG macOS
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
