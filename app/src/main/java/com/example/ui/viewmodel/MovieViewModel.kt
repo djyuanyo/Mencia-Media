@@ -190,6 +190,13 @@ class MovieViewModel(
 
     fun selectProfile(profile: Profile?) {
         _currentProfile.value = profile
+        if (profile != null) {
+            viewModelScope.launch {
+                try {
+                    repository.syncProgressForProfile(profile.id)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun createProfile(name: String, avatarColorIndex: Int, isKid: Boolean) {
@@ -293,13 +300,19 @@ class MovieViewModel(
                 _currentUserAccount.value = user
                 // Link or create a profile matching user name for their account
                 val userProfiles = repository.getProfilesForUser(user.id).first()
-                if (userProfiles.isNotEmpty()) {
+                val selectedProfile = if (userProfiles.isNotEmpty()) {
                     val matched = userProfiles.find { it.name.equals(user.name, ignoreCase = true) }
-                    _currentProfile.value = matched ?: userProfiles.first()
+                    matched ?: userProfiles.first()
                 } else {
                     val newProfile = Profile(userId = user.id, name = user.name, avatarColorIndex = 0, isKid = false)
                     val id = repository.insertProfile(newProfile)
-                    _currentProfile.value = newProfile.copy(id = id.toInt())
+                    newProfile.copy(id = id.toInt())
+                }
+                _currentProfile.value = selectedProfile
+                viewModelScope.launch {
+                    try {
+                        repository.syncProgressForProfile(selectedProfile.id)
+                    } catch (_: Exception) {}
                 }
                 Result.success(user)
             } else {
@@ -317,7 +330,15 @@ class MovieViewModel(
             if (user.isAdmin || user.isApproved) {
                 _currentUserAccount.value = user
                 val userProfiles = repository.getProfilesForUser(user.id).first()
-                _currentProfile.value = userProfiles.firstOrNull()
+                val selectedProfile = userProfiles.firstOrNull()
+                _currentProfile.value = selectedProfile
+                if (selectedProfile != null) {
+                    viewModelScope.launch {
+                        try {
+                            repository.syncProgressForProfile(selectedProfile.id)
+                        } catch (_: Exception) {}
+                    }
+                }
             }
             Result.success(user)
         } catch (e: Exception) {
@@ -387,6 +408,19 @@ class MovieViewModel(
         val profile = _currentProfile.value ?: return
         viewModelScope.launch {
             repository.deletePlaybackProgress(profile.id, movieId)
+        }
+    }
+
+    fun markAsWatched(movieId: Int, totalDurationMs: Long = 0) {
+        val profile = _currentProfile.value ?: return
+        viewModelScope.launch {
+            val dur = if (totalDurationMs > 0) totalDurationMs else 7200000L
+            repository.savePlaybackProgress(
+                profileId = profile.id,
+                movieId = movieId,
+                progressMs = dur,
+                durationMs = dur
+            )
         }
     }
 }

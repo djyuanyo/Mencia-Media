@@ -20,7 +20,7 @@ import com.example.data.model.Watchlist
         Watchlist::class,
         PlaybackProgress::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -89,6 +89,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE playback_progress ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -102,7 +108,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 .fallbackToDestructiveMigrationOnDowngrade(false)
                 .addCallback(object : RoomDatabase.Callback() {
@@ -116,6 +123,9 @@ abstract class AppDatabase : RoomDatabase() {
                         } catch (_: Exception) {}
                         try {
                             db.execSQL("ALTER TABLE profiles ADD COLUMN userId INTEGER NOT NULL DEFAULT 0")
+                        } catch (_: Exception) {}
+                        try {
+                            db.execSQL("ALTER TABLE playback_progress ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0")
                         } catch (_: Exception) {}
                     }
                 })

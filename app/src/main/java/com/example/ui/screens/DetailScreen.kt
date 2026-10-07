@@ -237,6 +237,23 @@ fun DetailScreen(
                             )
                         }
                     }
+
+                    // VISTO Badge
+                    if (progressDetails?.isWatched() == true) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF2BAD3B)
+                        ) {
+                            Text(
+                                text = "✓ VISTO",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 Text(
@@ -593,11 +610,52 @@ fun DetailScreen(
                     }
                 }
 
+                // Watched status toggle
+                val isWatched = progressDetails?.isWatched() == true
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isWatched) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF2BAD3B).copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, Color(0xFF2BAD3B))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2BAD3B), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Completada / Vista", color = Color(0xFF2BAD3B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        TextButton(onClick = { viewModel.clearPlaybackProgress(movie.id) }) {
+                            Text("Desmarcar", color = Color.LightGray, fontSize = 12.sp)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { viewModel.markAsWatched(movie.id) },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.LightGray),
+                            border = BorderStroke(0.8.dp, Color.Gray.copy(alpha = 0.5f))
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2BAD3B), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Marcar como vista", fontSize = 12.sp)
+                        }
+                    }
+                }
+
                 // If playback progress exists, offer options to clear it
-                if (savedProgress > 0) {
+                if (savedProgress > 0 && !isWatched) {
                     TextButton(
                         onClick = { viewModel.clearPlaybackProgress(movie.id) },
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -819,34 +877,56 @@ fun DetailScreen(
                                                     val isThisEpisode = progressDetails != null &&
                                                             ep.seasonNumber == progressDetails!!.seasonNumber &&
                                                             ep.episodeNumber == progressDetails!!.episodeNumber &&
-                                                            progressDetails!!.progressMs > 2000L
+                                                            (progressDetails!!.progressMs > 2000L || progressDetails!!.isWatched())
 
                                                     if (isThisEpisode) {
                                                         Spacer(modifier = Modifier.height(4.dp))
                                                         val fraction = progressDetails!!.getProgressFraction()
+                                                        val isEpWatched = progressDetails!!.isWatched()
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
                                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                         ) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .width(70.dp)
-                                                                    .height(4.dp)
-                                                                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
-                                                            ) {
+                                                            if (isEpWatched) {
+                                                                Surface(
+                                                                    shape = RoundedCornerShape(4.dp),
+                                                                    color = Color(0xFF2BAD3B)
+                                                                ) {
+                                                                    Row(
+                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+                                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                                        Text(
+                                                                            text = "VISTO",
+                                                                            color = Color.White,
+                                                                            fontSize = 9.sp,
+                                                                            fontWeight = FontWeight.Bold
+                                                                        )
+                                                                    }
+                                                                }
+                                                            } else {
                                                                 Box(
                                                                     modifier = Modifier
-                                                                        .fillMaxHeight()
-                                                                        .fillMaxWidth(fraction.coerceIn(0.05f, 1f))
-                                                                        .background(Color(0xFFFF9900), RoundedCornerShape(2.dp))
+                                                                        .width(70.dp)
+                                                                        .height(4.dp)
+                                                                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
+                                                                ) {
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .fillMaxHeight()
+                                                                            .fillMaxWidth(fraction.coerceIn(0.05f, 1f))
+                                                                            .background(Color(0xFFFF9900), RoundedCornerShape(2.dp))
+                                                                    )
+                                                                }
+                                                                Text(
+                                                                    text = "Progreso: ${progressDetails!!.formatProgressTime()} (${(fraction * 100).toInt()}% visto)",
+                                                                    color = Color(0xFFFF9900),
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Bold
                                                                 )
                                                             }
-                                                            Text(
-                                                                text = "Progreso: ${progressDetails!!.formatProgressTime()} (${(fraction * 100).toInt()}% visto)",
-                                                                color = Color(0xFFFF9900),
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
                                                         }
                                                     }
 

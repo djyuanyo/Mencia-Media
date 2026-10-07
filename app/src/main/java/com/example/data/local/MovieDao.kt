@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.Flow
 interface MovieDao {
 
     // --- USER ACCOUNTS ---
+    @Query("SELECT * FROM user_accounts WHERE id = :userId LIMIT 1")
+    suspend fun getUserById(userId: Int): UserAccount?
+
     @Query("SELECT * FROM user_accounts WHERE LOWER(email) = LOWER(:email) LIMIT 1")
     suspend fun getUserByEmailDirect(email: String): UserAccount?
 

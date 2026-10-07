@@ -147,8 +147,11 @@ data class PlaybackProgress(
     val episodeIndex: Int = 0,
     val episodeNumber: Int = 1,
     val seasonNumber: Int = 1,
-    val episodeTitle: String = ""
+    val episodeTitle: String = "",
+    val isCompleted: Boolean = false
 ) {
+    fun isWatched(): Boolean = isCompleted || (durationMs > 0 && progressMs >= (durationMs * 9L / 10L))
+
     fun formatProgressTime(): String {
         val totalSeconds = (progressMs / 1000).coerceAtLeast(0)
         val hours = totalSeconds / 3600

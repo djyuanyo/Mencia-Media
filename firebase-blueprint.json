@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Movie": {
+      "title": "Movie",
+      "description": "Película o serie en el catálogo",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Cuenta de usuario",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "PlaybackProgress": {
+      "title": "PlaybackProgress",
+      "description": "Progreso e historial de reproducción",
+      "type": "object",
+      "properties": {
+        "movieId": { "type": "number" },
+        "progressMs": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "/movies/{movieId}": {
+      "schema": "Movie",
+      "description": "Películas y series"
+    },
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "Usuarios registrados"
+    },
+    "/playback_progress/{progressId}": {
+      "schema": "PlaybackProgress",
+      "description": "Historial de reproducción y estado visto"
+    }
+  }
+}

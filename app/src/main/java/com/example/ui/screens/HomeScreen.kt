@@ -39,6 +39,7 @@ fun HomeScreen(
     val allMovies by viewModel.allMovies.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
     val continueWatching by viewModel.continueWatching.collectAsState()
+    val allPlaybackProgresses by viewModel.allPlaybackProgresses.collectAsState(initial = emptyMap())
 
     var selectedFormatFilter by remember { mutableStateOf("Todo") }
     val formatFilters = listOf("Todo", "Películas", "Series")
@@ -380,7 +381,11 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(recentlyAdded) { movie ->
-                                LandscapeMovieCard(movie, onNavigateToDetail)
+                                LandscapeMovieCard(
+                                    movie = movie,
+                                    isWatched = allPlaybackProgresses[movie.id]?.isWatched() == true,
+                                    onClick = onNavigateToDetail
+                                )
                             }
                         }
                     }
@@ -421,7 +426,11 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(seriesList) { movie ->
-                                LandscapeMovieCard(movie, onNavigateToDetail)
+                                LandscapeMovieCard(
+                                    movie = movie,
+                                    isWatched = allPlaybackProgresses[movie.id]?.isWatched() == true,
+                                    onClick = onNavigateToDetail
+                                )
                             }
                         }
                     }
@@ -445,7 +454,11 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(watchlist) { movie ->
-                                LandscapeMovieCard(movie, onNavigateToDetail)
+                                LandscapeMovieCard(
+                                    movie = movie,
+                                    isWatched = allPlaybackProgresses[movie.id]?.isWatched() == true,
+                                    onClick = onNavigateToDetail
+                                )
                             }
                         }
                     }
@@ -475,7 +488,11 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(genreMovies) { movie ->
-                                    LandscapeMovieCard(movie, onNavigateToDetail)
+                                    LandscapeMovieCard(
+                                        movie = movie,
+                                        isWatched = allPlaybackProgresses[movie.id]?.isWatched() == true,
+                                        onClick = onNavigateToDetail
+                                    )
                                 }
                             }
                         }
@@ -495,7 +512,8 @@ fun HomeScreen(
 @Composable
 fun LandscapeMovieCard(
     movie: Movie,
-    onClick: (Int) -> Unit
+    onClick: (Int) -> Unit,
+    isWatched: Boolean = false
 ) {
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Card(
@@ -549,7 +567,20 @@ fun LandscapeMovieCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                if (movie.category.equals("Series", ignoreCase = true)) {
+                if (isWatched) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF2BAD3B)
+                    ) {
+                        Text(
+                            text = "✓ VISTO",
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (movie.category.equals("Series", ignoreCase = true)) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = Color(0xFF2BAD3B)

@@ -328,7 +328,8 @@ private fun NativePlexExoPlayer(
                     }
                     Player.STATE_ENDED -> {
                         isPlaying = false
-                        viewModel.clearPlaybackProgress(movie.id)
+                        val finalDur = if (exoPlayer.duration > 0) exoPlayer.duration else durationMs
+                        viewModel.markAsWatched(movie.id, finalDur)
                         onNavigateBack()
                     }
                     Player.STATE_IDLE -> {
@@ -399,7 +400,15 @@ private fun NativePlexExoPlayer(
             val pos = exoPlayer.currentPosition
             val dur = exoPlayer.duration
             if (pos > 0 && dur > 0) {
-                viewModel.updatePlaybackProgress(movie.id, pos, dur)
+                viewModel.updatePlaybackProgress(
+                    movieId = movie.id,
+                    progressMs = pos,
+                    durationMs = dur,
+                    episodeIndex = episodeIndex,
+                    episodeNumber = episodeNumber,
+                    seasonNumber = seasonNumber,
+                    episodeTitle = episodeTitle
+                )
             }
             exoPlayer.pause()
         } else {
@@ -617,7 +626,15 @@ private fun NativePlexExoPlayer(
                         onClick = {
                             exoPlayer.seekTo(0L)
                             currentPosMs = 0L
-                            viewModel.updatePlaybackProgress(movie.id, 0L, durationMs)
+                            viewModel.updatePlaybackProgress(
+                                movieId = movie.id,
+                                progressMs = 0L,
+                                durationMs = durationMs,
+                                episodeIndex = episodeIndex,
+                                episodeNumber = episodeNumber,
+                                seasonNumber = seasonNumber,
+                                episodeTitle = episodeTitle
+                            )
                             resumeNotification = null
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
@@ -735,7 +752,15 @@ private fun NativePlexExoPlayer(
                             onClick = {
                                 exoPlayer.seekTo(0L)
                                 currentPosMs = 0L
-                                viewModel.updatePlaybackProgress(movie.id, 0L, durationMs)
+                                viewModel.updatePlaybackProgress(
+                                    movieId = movie.id,
+                                    progressMs = 0L,
+                                    durationMs = durationMs,
+                                    episodeIndex = episodeIndex,
+                                    episodeNumber = episodeNumber,
+                                    seasonNumber = seasonNumber,
+                                    episodeTitle = episodeTitle
+                                )
                             },
                             shape = RoundedCornerShape(16.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),

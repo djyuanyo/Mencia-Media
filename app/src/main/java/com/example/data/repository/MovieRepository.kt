@@ -18,6 +18,10 @@ class MovieRepository(
     private val context: Context? = null
 ) {
 
+    private val firestoreSync by lazy {
+        context?.let { FirestoreSyncService(it) }
+    }
+
     private val prefs by lazy {
         context?.getSharedPreferences("primeplex_catalog_prefs", Context.MODE_PRIVATE)
     }
@@ -50,37 +54,44 @@ class MovieRepository(
     fun getMovieById(id: Int): Flow<Movie?> = movieDao.getMovieById(id)
     suspend fun getMovieByIdDirect(id: Int): Movie? = movieDao.getMovieByIdDirect(id)
 
-    suspend fun insertProfile(profile: Profile): Long = movieDao.insertProfile(profile)
+    suspend fun insertProfile(profile: Profile): Long {
+        val id = movieDao.insertProfile(profile)
+        val saved = if (profile.id > 0) profile else profile.copy(id = id.toInt())
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestoreSync?.saveProfile(saved)
+            } catch (_: Exception) {}
+        }
+        return id
+    }
     suspend fun deleteProfile(profile: Profile) = movieDao.deleteProfile(profile)
     suspend fun getProfileById(id: Int): Profile? = movieDao.getProfileById(id)
 
     suspend fun insertMovie(movie: Movie): Long {
         unmarkMovieAsDeleted(movie.title, movie.year)
         val id = movieDao.insertMovie(movie)
-        // Automatically publish to shared cloud catalog so all other users and devices see it
+        val savedMovie = if (movie.id > 0) movie else movie.copy(id = id.toInt())
+        // Guardar y sincronizar en Firebase Firestore
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                CloudCatalogService.publishMovieToCloud(movie)
+                firestoreSync?.saveMovie(savedMovie)
+            } catch (_: Exception) {}
+            try {
+                CloudCatalogService.publishMovieToCloud(savedMovie)
             } catch (_: Exception) {}
         }
         return id
     }
 
     suspend fun syncWithCloud(): Int {
-        return try {
-            val cloudMovies = CloudCatalogService.fetchGlobalCatalog()
-            if (cloudMovies.isEmpty()) return 0
-            var addedCount = 0
+        var addedCount = 0
+        try {
             val localMovies = allMovies.first()
-            for (remoteMovie in cloudMovies) {
-                // If this movie was deleted by the user, DO NOT RESTORE IT!
-                if (isMovieMarkedDeleted(remoteMovie.title, remoteMovie.year)) {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        CloudCatalogService.deleteMovieFromCloud(remoteMovie.title, remoteMovie.year, remoteMovie.videoUrl)
-                    }
-                    continue
-                }
 
+            // 1. Sincronizar catálogo desde Firebase Firestore
+            val firestoreMovies = firestoreSync?.fetchMovies() ?: emptyList()
+            for (remoteMovie in firestoreMovies) {
+                if (isMovieMarkedDeleted(remoteMovie.title, remoteMovie.year)) continue
                 val existing = localMovies.find {
                     it.title.equals(remoteMovie.title, ignoreCase = true) &&
                             (it.year == remoteMovie.year || it.videoUrl == remoteMovie.videoUrl)
@@ -93,27 +104,73 @@ class MovieRepository(
                     addedCount++
                 }
             }
-            addedCount
-        } catch (_: Exception) {
-            0
-        }
+
+            // 2. Sincronizar usuarios desde Firebase Firestore
+            val firestoreUsers = firestoreSync?.fetchUsers() ?: emptyList()
+            for (remoteUser in firestoreUsers) {
+                val localUser = movieDao.getUserByEmailDirect(remoteUser.email)
+                if (localUser == null) {
+                    val uid = movieDao.insertUser(remoteUser).toInt()
+                    movieDao.insertProfile(
+                        Profile(
+                            userId = uid,
+                            name = remoteUser.name,
+                            avatarColorIndex = 0,
+                            isKid = false
+                        )
+                    )
+                } else if (localUser.isApproved != remoteUser.isApproved || localUser.isAdmin != remoteUser.isAdmin) {
+                    movieDao.updateUser(localUser.copy(isApproved = remoteUser.isApproved, isAdmin = remoteUser.isAdmin))
+                }
+            }
+
+            // 3. Fallback de compatibilidad de catálogo en nube
+            val cloudMovies = CloudCatalogService.fetchGlobalCatalog()
+            for (remoteMovie in cloudMovies) {
+                if (isMovieMarkedDeleted(remoteMovie.title, remoteMovie.year)) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        CloudCatalogService.deleteMovieFromCloud(remoteMovie.title, remoteMovie.year, remoteMovie.videoUrl)
+                    }
+                    continue
+                }
+
+                val existing = localMovies.find {
+                    it.title.equals(remoteMovie.title, ignoreCase = true) &&
+                            (it.year == remoteMovie.year || it.videoUrl == remoteMovie.videoUrl)
+                }
+                if (existing == null) {
+                    val newId = movieDao.insertMovie(remoteMovie)
+                    firestoreSync?.saveMovie(remoteMovie.copy(id = newId.toInt()))
+                    addedCount++
+                } else if (existing.videoUrl.isBlank() && remoteMovie.videoUrl.isNotBlank()) {
+                    val updated = existing.copy(videoUrl = remoteMovie.videoUrl)
+                    movieDao.insertMovie(updated)
+                    firestoreSync?.saveMovie(updated)
+                    addedCount++
+                }
+            }
+        } catch (_: Exception) {}
+        return addedCount
     }
 
     suspend fun deleteMovie(movie: Movie) {
-        // 1. Mark as permanently deleted in local persistent tombstone
+        // 1. Marcar como eliminada permanentemente
         markMovieAsDeleted(movie.title, movie.year)
 
-        // 2. Delete from local Room database
+        // 2. Eliminar de Room local
         movieDao.deleteMovie(movie)
 
-        // 3. Clean up playback progress & watchlist
+        // 3. Limpiar progreso y watchlist
         try {
             movieDao.deletePlaybackProgressForMovie(movie.id)
             movieDao.deleteWatchlistForMovie(movie.id)
         } catch (_: Exception) {}
 
-        // 4. Delete from shared cloud bin permanently
+        // 4. Eliminar de Firebase Firestore
         CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestoreSync?.deleteMovie(movie.id, movie.title, movie.year)
+            } catch (_: Exception) {}
             try {
                 CloudCatalogService.deleteMovieFromCloud(movie.title, movie.year, movie.videoUrl)
             } catch (_: Exception) {}
@@ -122,8 +179,11 @@ class MovieRepository(
 
     suspend fun updateMovie(movie: Movie) {
         movieDao.updateMovie(movie)
-        // Sync updated movie to cloud bin
+        // Sincronizar en Firebase Firestore
         CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestoreSync?.saveMovie(movie)
+            } catch (_: Exception) {}
             try {
                 CloudCatalogService.publishMovieToCloud(movie)
             } catch (_: Exception) {}
@@ -135,11 +195,26 @@ class MovieRepository(
 
     suspend fun getUserByEmail(email: String): UserAccount? = movieDao.getUserByEmailDirect(email.trim())
 
-    suspend fun setUserApproval(userId: Int, approved: Boolean) = movieDao.setUserApproval(userId, approved)
+    suspend fun setUserApproval(userId: Int, approved: Boolean) {
+        movieDao.setUserApproval(userId, approved)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val user = movieDao.getUserById(userId)
+                if (user != null) {
+                    firestoreSync?.saveUser(user.copy(isApproved = approved))
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     suspend fun deleteUser(user: UserAccount) {
         movieDao.deleteUser(user)
         movieDao.deleteProfilesForUser(user.id)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestoreSync?.deleteUser(user.email)
+            } catch (_: Exception) {}
+        }
     }
 
     fun getProfilesForUser(userId: Int): Flow<List<Profile>> = movieDao.getProfilesForUser(userId)
@@ -165,10 +240,37 @@ class MovieRepository(
                 movieDao.updateUser(updatedAdmin)
                 admin = updatedAdmin
             }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    firestoreSync?.saveUser(admin!!)
+                } catch (_: Exception) {}
+            }
             return admin
         }
 
-        val user = movieDao.authenticateUser(cleanEmail, cleanPassword) ?: return null
+        var user = movieDao.authenticateUser(cleanEmail, cleanPassword)
+        if (user == null) {
+            // Comprobar si existe en Firebase Firestore
+            try {
+                val remoteUsers = firestoreSync?.fetchUsers() ?: emptyList()
+                val matched = remoteUsers.find {
+                    it.email.equals(cleanEmail, ignoreCase = true) && it.password == cleanPassword
+                }
+                if (matched != null) {
+                    val uid = movieDao.insertUser(matched).toInt()
+                    movieDao.insertProfile(
+                        Profile(
+                            userId = uid,
+                            name = matched.name,
+                            avatarColorIndex = 0,
+                            isKid = false
+                        )
+                    )
+                    user = matched.copy(id = uid)
+                }
+            } catch (_: Exception) {}
+        }
+        if (user == null) return null
 
         // Enforce administrator approval check
         if (!user.isApproved && !user.isAdmin) {
@@ -199,6 +301,13 @@ class MovieRepository(
         )
         val id = movieDao.insertUser(newUser)
         val userWithId = newUser.copy(id = id.toInt())
+
+        // Guardar en Firestore
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                firestoreSync?.saveUser(userWithId)
+            } catch (_: Exception) {}
+        }
 
         // Create initial default profile for this user
         movieDao.insertProfile(
@@ -237,6 +346,7 @@ class MovieRepository(
         seasonNumber: Int = 1,
         episodeTitle: String = ""
     ) {
+        val isCompleted = durationMs > 0 && progressMs >= (durationMs * 9L / 10L)
         val progress = PlaybackProgress(
             profileId = profileId,
             movieId = movieId,
@@ -246,13 +356,73 @@ class MovieRepository(
             episodeIndex = episodeIndex,
             episodeNumber = episodeNumber,
             seasonNumber = seasonNumber,
-            episodeTitle = episodeTitle
+            episodeTitle = episodeTitle,
+            isCompleted = isCompleted
         )
         movieDao.insertPlaybackProgress(progress)
+        // Guardar y sincronizar progreso e historial en Firebase Firestore
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val movie = movieDao.getMovieByIdDirect(movieId)
+                val profile = movieDao.getProfileById(profileId)
+                val user = profile?.let { movieDao.getUserById(it.userId) }
+                firestoreSync?.savePlaybackProgress(
+                    progress = progress,
+                    movieTitle = movie?.title ?: "",
+                    movieYear = movie?.year ?: "",
+                    userEmail = user?.email ?: "",
+                    profileName = profile?.name ?: ""
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun deletePlaybackProgress(profileId: Int, movieId: Int) {
+        movieDao.deletePlaybackProgress(profileId, movieId)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val movie = movieDao.getMovieByIdDirect(movieId)
+                val profile = movieDao.getProfileById(profileId)
+                val user = profile?.let { movieDao.getUserById(it.userId) }
+                firestoreSync?.deletePlaybackProgress(
+                    profileId = profileId,
+                    movieId = movieId,
+                    userEmail = user?.email ?: "",
+                    profileName = profile?.name ?: "",
+                    movieTitle = movie?.title ?: ""
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun syncProgressForProfile(profileId: Int) {
+        try {
+            val profile = movieDao.getProfileById(profileId)
+            val user = profile?.let { movieDao.getUserById(it.userId) }
+            val records = firestoreSync?.fetchPlaybackProgressRecords(
+                profileId = profileId,
+                userEmail = user?.email ?: "",
+                profileName = profile?.name ?: ""
+            ) ?: emptyList()
+
+            val localMovies = allMovies.first()
+            for (rec in records) {
+                var targetMovieId = rec.progress.movieId
+                if (rec.movieTitle.isNotBlank()) {
+                    val found = localMovies.find { it.title.equals(rec.movieTitle, ignoreCase = true) }
+                    if (found != null) {
+                        targetMovieId = found.id
+                    }
+                }
+                if (targetMovieId > 0) {
+                    val adjusted = rec.progress.copy(profileId = profileId, movieId = targetMovieId)
+                    movieDao.insertPlaybackProgress(adjusted)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     suspend fun getPlaybackProgressDirect(profileId: Int, movieId: Int): PlaybackProgress? = movieDao.getPlaybackProgressDirect(profileId, movieId)
-    suspend fun deletePlaybackProgress(profileId: Int, movieId: Int) = movieDao.deletePlaybackProgress(profileId, movieId)
 
     fun getContinueWatching(profileId: Int): Flow<List<Movie>> = movieDao.getContinueWatchingMovies(profileId)
 
