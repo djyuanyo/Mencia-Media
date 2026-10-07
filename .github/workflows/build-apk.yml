@@ -20,21 +20,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.3.1'
           cache-disabled: false
 
-      - name: Preparar entorno, licencias y SDK 36
+      - name: Preparar entorno y licencias de Android
         run: |
           touch .env
           echo "sdk.dir=$ANDROID_HOME" > local.properties
@@ -43,7 +39,6 @@ jobs:
           echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
           echo -e "\n84831b9409646a532e3034252650a149d425c276" >> "$ANDROID_HOME/licenses/android-sdk-preview-license" || true
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" || true
 
       - name: Asegurar debug.keystore
         run: |
