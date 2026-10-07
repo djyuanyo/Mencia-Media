@@ -30,15 +30,16 @@ jobs:
         with:
           cache-disabled: false
 
-      - name: Preparar entorno y licencias de Android
+      - name: Preparar entorno, licencias y SDK 36
         run: |
           touch .env
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           mkdir -p "$ANDROID_HOME/licenses" || true
-          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo -e "\n84831b9409646a532e3034252650a149d425c276" >> "$ANDROID_HOME/licenses/android-sdk-preview-license" || true
+          echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license" || true
+          echo -e "84831b9409646a918e30573bab4c9c91346d8abd\n84831b9409646a532e3034252650a149d425c276" > "$ANDROID_HOME/licenses/android-sdk-preview-license" || true
+          echo "601085b94cd77f0b54ff86406957099ebe79c4d6" > "$ANDROID_HOME/licenses/android-googletv-license" || true
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" || true
 
       - name: Asegurar debug.keystore
         run: |
@@ -58,7 +59,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Compilar APK (Debug)
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
 
       - name: Preparar APK
         run: |
