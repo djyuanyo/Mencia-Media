@@ -20,37 +20,33 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Configurar Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
         with:
-          cache-disabled: false
+          packages: 'platforms;android-36 build-tools;36.0.0 platform-tools'
 
-      - name: Preparar entorno, licencias y SDK 36
+      - name: Aceptar licencias y configurar entorno
         run: |
           touch .env
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          cp .env.example .env 2>/dev/null || true
           mkdir -p "$ANDROID_HOME/licenses" || true
-          echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo -e "84831b9409646a918e30573bab4c9c91346d8abd\n84831b9409646a532e3034252650a149d425c276" > "$ANDROID_HOME/licenses/android-sdk-preview-license" || true
-          echo "601085b94cd77f0b54ff86406957099ebe79c4d6" > "$ANDROID_HOME/licenses/android-googletv-license" || true
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" || true
-          if [ -d "$ANDROID_HOME/platforms/android-36" ] && [ ! -d "$ANDROID_HOME/platforms/android-36.1" ]; then
-            cp -r "$ANDROID_HOME/platforms/android-36" "$ANDROID_HOME/platforms/android-36.1" || true
-          fi
-          ls -la "$ANDROID_HOME/platforms/" || true
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n84831b9409646a532e3034252650a149d425c276\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b94cd77f0b54ff86406957099ebe79c4d6\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          yes | sdkmanager --licenses || true
 
       - name: Asegurar debug.keystore
         run: |
           if [ ! -s debug.keystore ]; then
             if [ -f debug.keystore.base64 ]; then
               echo "Decodificando debug.keystore.base64..."
-              base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null || true
+              tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore 2>/dev/null || base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
             fi
           fi
           if [ ! -s debug.keystore ]; then
@@ -58,6 +54,11 @@ jobs:
             keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
           ls -la debug.keystore
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: false
 
       - name: Dar permisos de ejecución a gradlew
         run: chmod +x gradlew
@@ -69,6 +70,7 @@ jobs:
         run: |
           mkdir -p release-apk
           cp app/build/outputs/apk/debug/app-debug.apk release-apk/PrimePlex-debug.apk
+          ls -la release-apk/
 
       - name: Subir artefacto APK para descarga directa
         uses: actions/upload-artifact@v4

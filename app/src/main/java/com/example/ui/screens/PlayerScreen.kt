@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.SendToMobile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -1276,7 +1277,7 @@ fun ChromecastDialog(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.SendToMobile, contentDescription = null, tint = Color(0xFFFF9900), modifier = Modifier.size(24.dp))
+                        Icon(Icons.AutoMirrored.Filled.SendToMobile, contentDescription = null, tint = Color(0xFFFF9900), modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("Transmitir con Web Video Caster / VLC", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
