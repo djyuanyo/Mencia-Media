@@ -45,6 +45,56 @@ Si tienes el proyecto abierto en el entorno de Google AI Studio:
 
 ---
 
+## 🌐 Dominio Gratuito Oficial en GitHub Pages
+
+Tu proyecto tiene asignado un **dominio gratuito oficial de GitHub** con certificado SSL (HTTPS) y CDN global de alta velocidad:
+
+* 🚀 **Tu Dominio Gratuito de GitHub:**
+  👉 [**`https://djyuanyo.github.io/Mencia-Media/`**](https://djyuanyo.github.io/Mencia-Media/)
+
+### 🌟 ¿Qué funciones tiene tu dominio de GitHub Pages?
+1. **Portal Web Oficial PrimePlex:**
+   * Página web moderna con la estética cinematográfica de **Amazon Prime Video**.
+   * Muestra las características de la aplicación, carrusel de películas y enlaces de acceso.
+2. **Descarga Directa del APK:**
+   * Los usuarios pueden descargar directamente el archivo `PrimePlex-debug.apk` desde tu web.
+3. **Android App Links & Deep Linking:**
+   * La app está vinculada a `djyuanyo.github.io`. Los enlaces tipo `https://djyuanyo.github.io/Mencia-Media/watch/{id}` abren directamente la película dentro de la app instalada.
+4. **Despliegue 100% Automático:**
+   * El flujo de GitHub Actions (`.github/workflows/build-apk.yml`) compila el APK y publica la web automáticamente en GitHub Pages en cada push a `main`.
+
+### ⚙️ Activación rápida en tu repositorio de GitHub (si aún no está activo):
+1. Ve a tu repositorio en GitHub: `https://github.com/djyuanyo/Mencia-Media`
+2. Entra en **Settings** (pestaña superior derecha).
+3. En el menú izquierdo, haz clic en **Pages**.
+4. En **Build and deployment** > **Source**, selecciona **GitHub Actions**.
+5. ¡Listo! Cada vez que el flujo termine de compilar, tu web estará publicada en `https://djyuanyo.github.io/Mencia-Media/`.
+
+---
+
+## 🌐 Dominios Adicionales de Firebase Asociados
+
+Tu app está vinculada a los dominios gratuitos oficiales de **Firebase Hosting**:
+
+* 🔗 **Dominio Principal:** [`https://gen-lang-client-0763337447.web.app`](https://gen-lang-client-0763337447.web.app)
+* 🔗 **Dominio Alternativo:** [`https://gen-lang-client-0763337447.firebaseapp.com`](https://gen-lang-client-0763337447.firebaseapp.com)
+
+### ¿Qué incluye esta asociación?
+1. **Android App Links (Digital Asset Links):**
+   * Configurado en `public/.well-known/assetlinks.json` y `AndroidManifest.xml` con verificación automática (`autoVerify="true"`).
+   * Al abrir un enlace del dominio en Android, se abre directamente dentro de la aplicación PrimePlex sin pasar por el navegador.
+2. **Portal Web & Descarga:**
+   * La carpeta `public/` contiene una web estilo Amazon Prime Video para promocionar la app, mostrar los enlaces de descarga directa del APK e interactuar con la app.
+3. **Cómo desplegar en Firebase Hosting:**
+   * **Desde la terminal local con Firebase CLI:**
+     ```bash
+     firebase login
+     firebase deploy --only hosting
+     ```
+   * **Automático en GitHub Actions:** Puedes añadir el secreto `FIREBASE_TOKEN` en GitHub Secrets y se desplegará automáticamente con cada compilación.
+
+---
+
 ## 🛠️ Características Principales
 * 🌐 **Integración de Metadatos Multi-Fuente**:
   * **TMDB (The Movie Database)**: Resúmenes en español, imágenes en alta resolución y reparto oficial.

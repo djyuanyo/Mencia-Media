@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.example.data.local.AppDatabase
 import com.example.data.repository.MovieRepository
 import com.example.ui.screens.AuthScreen
@@ -121,7 +122,15 @@ class MainActivity : ComponentActivity() {
                         // 3. Movie Details Screen Display
                         composable(
                             route = "detail/{movieId}",
-                            arguments = listOf(navArgument("movieId") { type = NavType.IntType })
+                            arguments = listOf(navArgument("movieId") { type = NavType.IntType }),
+                            deepLinks = listOf(
+                                navDeepLink { uriPattern = "https://djyuanyo.github.io/Mencia-Media/detail/{movieId}" },
+                                navDeepLink { uriPattern = "https://djyuanyo.github.io/Mencia-Media/movie/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.web.app/detail/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.web.app/movie/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.firebaseapp.com/detail/{movieId}" },
+                                navDeepLink { uriPattern = "primeplex://detail/{movieId}" }
+                            )
                         ) { backStackEntry ->
                             val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
                             DetailScreen(
@@ -165,7 +174,15 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             route = "player/{movieId}",
-                            arguments = listOf(navArgument("movieId") { type = NavType.IntType })
+                            arguments = listOf(navArgument("movieId") { type = NavType.IntType }),
+                            deepLinks = listOf(
+                                navDeepLink { uriPattern = "https://djyuanyo.github.io/Mencia-Media/player/{movieId}" },
+                                navDeepLink { uriPattern = "https://djyuanyo.github.io/Mencia-Media/watch/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.web.app/player/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.web.app/watch/{movieId}" },
+                                navDeepLink { uriPattern = "https://gen-lang-client-0763337447.firebaseapp.com/watch/{movieId}" },
+                                navDeepLink { uriPattern = "primeplex://watch/{movieId}" }
+                            )
                         ) { backStackEntry ->
                             val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
                             PlayerScreen(

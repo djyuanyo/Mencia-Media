@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aistudio.primeplex.vqmrtz",
+      "sha256_cert_fingerprints": [
+        "77:16:2F:BE:B0:D1:50:DA:EB:EA:AB:29:20:C1:B4:96:E5:91:23:EB:2B:7D:FD:E8:02:4D:7A:0A:47:67:2D:AD"
+      ]
+    }
+  }
+]

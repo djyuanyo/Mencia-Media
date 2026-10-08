@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -60,11 +62,35 @@ jobs:
       - name: Compilar APK (Debug)
         run: ./gradlew assembleDebug --no-daemon --no-configuration-cache --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=512m" --stacktrace
 
-      - name: Preparar APK para entrega
+      - name: Preparar APK para entrega y Web
         run: |
           mkdir -p release-apk
           cp app/build/outputs/apk/debug/app-debug.apk release-apk/PrimePlex-debug.apk
+          mkdir -p public
+          cp app/build/outputs/apk/debug/app-debug.apk public/PrimePlex-debug.apk || true
+          touch public/.nojekyll
           ls -la release-apk/
+          ls -la public/
+
+      - name: Configurar GitHub Pages
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Subir artefacto para GitHub Pages
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'public'
+
+      - name: Desplegar en Firebase Hosting (Opcional si FIREBASE_TOKEN está configurado)
+        if: env.FIREBASE_TOKEN != ''
+        continue-on-error: true
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only hosting --non-interactive --token "$FIREBASE_TOKEN"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Subir artefacto APK para descarga directa
         uses: actions/upload-artifact@v4
@@ -91,3 +117,16 @@ jobs:
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-pages:
+    name: Desplegar en GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - name: Desplegar en Dominio Gratis de GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
