@@ -3,50 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PrimePlex - Streaming & Cloud Hub</title>
-  <meta name="description" content="PrimePlex - Tu plataforma privada de streaming con diseño Prime Video y tecnología Firebase Cloud.">
+  <title>PrimePlex Web - Streaming & Reproductor de Películas</title>
+  <meta name="description" content="PrimePlex Web - Reproduce tus películas y series de Google Drive, enlaces MP4 y catálogo en la nube desde cualquier navegador o dispositivo.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%2300A8E1%22/><path d=%22M38 28 L72 50 L38 72 Z%22 fill=%22%23FFFFFF%22/></svg>">
   <style>
     :root {
-      --bg-dark: #09111E;
+      --bg-dark: #070D16;
+      --bg-surface: #0E1826;
       --card-bg: #142234;
-      --card-hover: #1E314A;
+      --card-hover: #1D304A;
       --primary: #00A8E1;
       --primary-hover: #19B7ED;
       --accent: #E5A00D;
+      --accent-green: #00E676;
       --text-main: #FFFFFF;
       --text-muted: #8FA2B7;
       --border-color: rgba(255, 255, 255, 0.08);
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-family);
     }
 
     body {
       background-color: var(--bg-dark);
       color: var(--text-main);
-      line-height: 1.6;
+      line-height: 1.5;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
-    /* Navigation Bar */
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070D16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E314B;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--primary);
+    }
+
+    /* Header */
     header {
       background: rgba(9, 17, 30, 0.95);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--border-color);
       position: sticky;
       top: 0;
-      z-index: 100;
-      padding: 1rem 2rem;
+      z-index: 1000;
+      padding: 0.8rem 2rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 1rem;
     }
 
     .brand {
@@ -58,261 +79,652 @@
     }
 
     .brand-logo {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       background: linear-gradient(135deg, #00A8E1, #007399);
-      border-radius: 8px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 168, 225, 0.35);
+      box-shadow: 0 4px 14px rgba(0, 168, 225, 0.4);
     }
 
     .brand-logo svg {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       fill: #fff;
     }
 
     .brand-title {
-      font-size: 1.35rem;
+      font-size: 1.4rem;
       font-weight: 800;
       letter-spacing: -0.5px;
     }
-
     .brand-title span {
       color: var(--primary);
     }
 
-    .badge-domain {
-      background: rgba(0, 168, 225, 0.15);
-      color: var(--primary);
-      border: 1px solid rgba(0, 168, 225, 0.3);
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .badge-domain::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      background: #00E676;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #00E676;
-    }
-
-    /* Hero Section */
-    .hero {
-      padding: 4.5rem 2rem 3rem;
-      max-width: 1100px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .hero-tagline {
-      color: var(--primary);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-
-    .hero h1 {
-      font-size: 2.8rem;
-      font-weight: 800;
-      line-height: 1.2;
-      margin-bottom: 1.25rem;
-      background: linear-gradient(180deg, #FFFFFF 30%, #C4D3E6 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero p {
-      font-size: 1.15rem;
-      color: var(--text-muted);
-      max-width: 720px;
-      margin: 0 auto 2.5rem;
-    }
-
-    .cta-container {
+    .nav-links {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 1rem;
-      margin-bottom: 3rem;
+      align-items: center;
+      gap: 1.25rem;
+      list-style: none;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: color 0.2s;
+      cursor: pointer;
+    }
+    .nav-link:hover, .nav-link.active {
+      color: var(--primary);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
     }
 
     .btn {
-      padding: 0.9rem 1.75rem;
+      padding: 0.6rem 1.1rem;
       border-radius: 8px;
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: 600;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 0.6rem;
-      transition: all 0.25s ease;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
       cursor: pointer;
+      border: none;
     }
 
     .btn-primary {
       background: var(--primary);
-      color: #09111E;
+      color: #070D16;
       font-weight: 700;
-      box-shadow: 0 4px 20px rgba(0, 168, 225, 0.4);
+      box-shadow: 0 4px 14px rgba(0, 168, 225, 0.35);
     }
-
     .btn-primary:hover {
       background: var(--primary-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(0, 168, 225, 0.55);
+      transform: translateY(-1px);
     }
 
     .btn-secondary {
-      background: var(--card-bg);
+      background: rgba(255, 255, 255, 0.08);
       color: #FFFFFF;
       border: 1px solid var(--border-color);
     }
-
     .btn-secondary:hover {
-      background: var(--card-hover);
+      background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
     }
 
-    /* Domain Status Info Card */
-    .domain-card {
-      background: linear-gradient(145deg, #121F30, #0B1626);
-      border: 1px solid rgba(0, 168, 225, 0.25);
-      border-radius: 16px;
-      padding: 1.75rem;
-      max-width: 800px;
-      margin: 0 auto 4rem;
-      text-align: left;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    .btn-accent {
+      background: linear-gradient(135deg, #00A8E1, #007399);
+      color: #FFFFFF;
     }
 
-    .domain-card-header {
+    /* Top Link Player Bar */
+    .quick-player-bar {
+      background: linear-gradient(90deg, #0D1B2D, #12253E);
+      border-bottom: 1px solid rgba(0, 168, 225, 0.25);
+      padding: 1rem 2rem;
+    }
+
+    .quick-player-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .quick-player-label {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .quick-input-group {
+      flex: 1;
+      min-width: 280px;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .quick-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      color: #FFF;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .quick-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(0, 168, 225, 0.25);
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      position: relative;
+      min-height: 440px;
+      display: flex;
+      align-items: flex-end;
+      padding: 3rem 2.5rem;
+      background-size: cover;
+      background-position: center 25%;
+      border-bottom: 1px solid var(--border-color);
+      transition: background-image 0.5s ease;
+    }
+
+    .hero-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(7, 13, 22, 0.3) 0%, rgba(7, 13, 22, 0.85) 65%, #070D16 100%),
+                  linear-gradient(90deg, rgba(7, 13, 22, 0.95) 0%, rgba(7, 13, 22, 0.6) 50%, transparent 100%);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 680px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 168, 225, 0.2);
+      color: var(--primary);
+      border: 1px solid rgba(0, 168, 225, 0.4);
+      border-radius: 4px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero-title {
+      font-size: 2.6rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .hero-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .imdb-badge {
+      background: #E5A00D;
+      color: #000;
+      font-weight: 800;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .hero-description {
+      font-size: 1rem;
+      color: #D3DEEC;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .hero-buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    /* Filter & Search Bar */
+    .catalog-controls {
+      max-width: 1400px;
+      margin: 1.5rem auto 0.5rem;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .categories-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .cat-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .cat-pill:hover, .cat-pill.active {
+      background: var(--primary);
+      color: #070D16;
+      border-color: var(--primary);
+      font-weight: 700;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.45rem 0.8rem;
+      width: 260px;
+    }
+    .search-box svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--text-muted);
+      margin-right: 0.5rem;
+    }
+    .search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #FFF;
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    /* Catalog Sections */
+    .section-container {
+      max-width: 1400px;
+      margin: 1.5rem auto;
+      padding: 0 2rem;
+    }
+
+    .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 1rem;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-
-    .domain-card-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .domain-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .domain-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-family: monospace;
-      font-size: 0.95rem;
-      color: #7FE5FF;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .domain-item a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .domain-item a:hover {
-      text-decoration: underline;
-    }
-
-    .domain-badge {
-      font-size: 0.75rem;
-      background: rgba(0, 230, 118, 0.15);
-      color: #00E676;
-      border: 1px solid rgba(0, 230, 118, 0.3);
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      font-family: sans-serif;
-    }
-
-    /* Features Grid */
-    .features {
-      max-width: 1100px;
-      margin: 0 auto 4rem;
-      padding: 0 2rem;
     }
 
     .section-title {
-      text-align: center;
-      font-size: 1.8rem;
+      font-size: 1.4rem;
       font-weight: 700;
-      margin-bottom: 2rem;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    .grid {
+    .movie-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
       gap: 1.5rem;
     }
 
-    .feature-card {
+    /* Movie Card */
+    .movie-card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 1.75rem;
-      transition: all 0.3s ease;
-    }
-
-    .feature-card:hover {
-      background: var(--card-hover);
-      border-color: rgba(0, 168, 225, 0.4);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    }
-
-    .feature-icon {
-      width: 48px;
-      height: 48px;
-      background: rgba(0, 168, 225, 0.12);
       border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .movie-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      border-color: rgba(0, 168, 225, 0.6);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), 0 0 16px rgba(0, 168, 225, 0.25);
+    }
+
+    .poster-wrapper {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #0B1422;
+      overflow: hidden;
+    }
+
+    .poster-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .movie-card:hover .poster-img {
+      transform: scale(1.05);
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1.25rem;
-      color: var(--primary);
-      font-size: 1.5rem;
+      opacity: 0;
+      transition: opacity 0.2s;
     }
 
-    .feature-card h3 {
-      font-size: 1.2rem;
+    .movie-card:hover .play-overlay {
+      opacity: 1;
+    }
+
+    .play-icon-circle {
+      width: 48px;
+      height: 48px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(0, 168, 225, 0.6);
+    }
+    .play-icon-circle svg {
+      width: 22px;
+      height: 22px;
+      fill: #070D16;
+      margin-left: 2px;
+    }
+
+    .card-badges {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .card-badge-cat {
+      background: rgba(9, 17, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--primary);
+      font-size: 0.7rem;
       font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+    }
+
+    .movie-info {
+      padding: 0.9rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .movie-card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 0.3rem;
+      color: #FFF;
+    }
+
+    .movie-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .movie-card-rating {
+      color: var(--accent);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    /* Video Player Modal / Cinema View */
+    .player-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.94);
+      backdrop-filter: blur(12px);
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .player-modal.open {
+      display: flex;
+    }
+
+    .player-header {
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(7, 13, 22, 0.9);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .player-title-info h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .player-title-info span {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .close-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #FFF;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .player-container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .video-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 168, 225, 0.2);
+    }
+
+    .video-element, .iframe-element {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+    }
+
+    .player-details {
+      margin-top: 1.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .player-details-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .player-overview {
+      color: #D3DEEC;
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+
+    .player-cast {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .player-cast strong {
+      color: #FFF;
+    }
+
+    /* Episodes Selector for Series */
+    .episodes-section {
+      margin-top: 1.5rem;
+    }
+
+    .episodes-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--primary);
+    }
+
+    .episodes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .episode-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .episode-item:hover, .episode-item.active {
+      background: rgba(0, 168, 225, 0.15);
+      border-color: var(--primary);
+    }
+
+    .episode-meta {
+      display: flex;
+      flex-direction: column;
+    }
+    .episode-num {
+      font-size: 0.8rem;
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .episode-name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #FFF;
+    }
+
+    /* App Download Section */
+    .app-download-bar {
+      background: linear-gradient(135deg, #09172A, #10253F);
+      border-top: 1px solid rgba(0, 168, 225, 0.3);
+      border-bottom: 1px solid rgba(0, 168, 225, 0.3);
+      padding: 2.5rem 2rem;
+      margin-top: 3rem;
+    }
+
+    .app-download-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .app-download-text h3 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #FFF;
       margin-bottom: 0.5rem;
     }
 
-    .feature-card p {
+    .app-download-text p {
       color: var(--text-muted);
+      max-width: 600px;
       font-size: 0.95rem;
-      line-height: 1.5;
+    }
+
+    .domain-pills {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .domain-pill {
+      background: rgba(0, 230, 118, 0.12);
+      color: var(--accent-green);
+      border: 1px solid rgba(0, 230, 118, 0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
     }
 
     /* Footer */
@@ -322,144 +734,756 @@
       padding: 2rem;
       text-align: center;
       color: var(--text-muted);
-      font-size: 0.9rem;
-      background: #060B13;
+      font-size: 0.85rem;
+      background: #050A12;
     }
 
     footer a {
       color: var(--primary);
       text-decoration: none;
     }
-
     footer a:hover {
       text-decoration: underline;
     }
 
-    @media (max-width: 600px) {
-      .hero h1 {
-        font-size: 2rem;
+    /* Responsive */
+    @media (max-width: 768px) {
+      header {
+        padding: 0.8rem 1rem;
       }
-      .cta-container {
-        flex-direction: column;
+      .nav-links {
+        display: none;
       }
-      .btn {
-        width: 100%;
-        justify-content: center;
+      .hero-banner {
+        padding: 2rem 1.25rem;
+        min-height: 380px;
+      }
+      .hero-title {
+        font-size: 1.9rem;
+      }
+      .catalog-controls {
+        padding: 0 1rem;
+      }
+      .section-container {
+        padding: 0 1rem;
+      }
+      .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+      }
+      .player-details-grid {
+        grid-template-columns: 1fr;
+      }
+      .quick-player-bar {
+        padding: 0.8rem 1rem;
       }
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
+  <!-- Navigation Header -->
   <header>
-    <a href="#" class="brand">
+    <a href="#" class="brand" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">
       <div class="brand-logo">
         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </div>
-      <div class="brand-title">Prime<span>Plex</span></div>
+      <div class="brand-title">Prime<span>Plex Web</span></div>
     </a>
-    <div class="badge-domain">
-      GitHub Pages Activo
+
+    <ul class="nav-links">
+      <li><a class="nav-link active" onclick="filterCatalog('Todas')">Inicio</a></li>
+      <li><a class="nav-link" onclick="filterCatalog('Películas')">Películas</a></li>
+      <li><a class="nav-link" onclick="filterCatalog('Series')">Series</a></li>
+      <li><a class="nav-link" onclick="focusQuickPlayer()">Reproductor URL</a></li>
+      <li><a class="nav-link" onclick="scrollToDownload()">Descargar APK</a></li>
+    </ul>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary" onclick="openAddMovieModal()" title="Añadir Película a la Nube">
+        <span>➕ Añadir Enlace</span>
+      </button>
+      <a href="PrimePlex-debug.apk" download="PrimePlex-debug.apk" class="btn btn-primary" id="header-apk-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+        <span>Descargar APK</span>
+      </a>
     </div>
   </header>
 
-  <!-- Hero Section -->
-  <section class="hero">
-    <div class="hero-tagline">PLATAFORMA PRIVADA DE STREAMING</div>
-    <h1>Tu cine personal con el diseño Prime Video</h1>
-    <p>
-      Streaming de películas y series alojadas en Google Drive o WordPress, perfiles independientes con control parental, y sincronización en la nube con Firebase.
-    </p>
-
-    <!-- Call to Actions -->
-    <div class="cta-container">
-      <a href="https://github.com/djyuanyo/Mencia-Media/releases/latest/download/PrimePlex-debug.apk" class="btn btn-primary" id="btn-download" target="_blank" rel="noopener">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-        Descargar APK Directo (Android & TV)
-      </a>
-      <a href="primeplex://" class="btn btn-secondary" id="btn-open-app">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
-        Abrir en la App instalada
-      </a>
-    </div>
-
-    <!-- Domain Association Status Card -->
-    <div class="domain-card">
-      <div class="domain-card-header">
-        <div class="domain-card-title">
-          <span>🌐</span> Dominio Gratuito de GitHub Asignado
-        </div>
-        <span class="badge-domain">GitHub Pages SSL Gratis</span>
+  <!-- Quick URL / Google Drive Player Bar -->
+  <section class="quick-player-bar">
+    <div class="quick-player-inner">
+      <div class="quick-player-label">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        <span>Reproducir Enlace Directo / Drive:</span>
       </div>
-      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-        Tu plataforma y aplicación están vinculadas a tu dominio gratuito oficial en <strong>GitHub Pages</strong> y <strong>Firebase</strong>:
+      <div class="quick-input-group">
+        <input type="url" id="quick-url-input" class="quick-input" placeholder="Pega aquí enlace de Google Drive, MP4, HLS m3u8 o video..." onkeydown="if(event.key==='Enter') playCustomUrl()">
+        <button class="btn btn-primary" onclick="playCustomUrl()">
+          <span>▶ Reproducir</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hero Cinematic Banner -->
+  <section class="hero-banner" id="hero-banner" style="background-image: url('https://images.unsplash.com/photo-1547483238-f400e65ccd56?w=1600&q=80');">
+    <div class="hero-gradient"></div>
+    <div class="hero-content">
+      <div class="hero-badge" id="hero-badge">DESTACADO EN PRIMEPLEX</div>
+      <h1 class="hero-title" id="hero-title">Sintel</h1>
+      <div class="hero-meta">
+        <span class="imdb-badge" id="hero-rating">8.2 ★ IMDb</span>
+        <span id="hero-year">2010</span>
+        <span id="hero-duration">14 min</span>
+        <span id="hero-genre">Fantasía / Aventura</span>
+      </div>
+      <p class="hero-description" id="hero-description">
+        La tierna historia de una chica que rescata a un pequeño dragón. Cuando es secuestrado por una bestia colosal, Sintel se embarca en un viaje épico lleno de peligros, sacrificios y aventuras visuales espectaculares.
       </p>
-      <div class="domain-list">
-        <div class="domain-item">
-          <a href="https://djyuanyo.github.io/Mencia-Media/" target="_blank" rel="noopener">
-            https://djyuanyo.github.io/Mencia-Media/
-          </a>
-          <span class="domain-badge" style="background: rgba(0, 168, 225, 0.25); color: #00A8E1;">Dominio GitHub Pages</span>
-        </div>
-        <div class="domain-item">
-          <a href="https://gen-lang-client-0763337447.web.app" target="_blank" rel="noopener">
-            https://gen-lang-client-0763337447.web.app
-          </a>
-          <span class="domain-badge">Dominio Firebase</span>
-        </div>
+      <div class="hero-buttons">
+        <button class="btn btn-primary" id="hero-play-btn" onclick="playHeroMovie()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>Reproducir Ahora</span>
+        </button>
+        <button class="btn btn-secondary" id="hero-trailer-btn" onclick="playHeroTrailer()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+          <span>Ver Tráiler</span>
+        </button>
       </div>
     </div>
   </section>
 
-  <!-- Features Grid -->
-  <section class="features">
-    <h2 class="section-title">Características Principales</h2>
-    <div class="grid">
-      <div class="feature-card">
-        <div class="feature-icon">☁️</div>
-        <h3>Cloud Sync Firebase</h3>
-        <p>Tus películas, carátulas y lista de reproducción se sincronizan automáticamente en Firestore para todos tus dispositivos.</p>
-      </div>
+  <!-- Controls: Categories & Search -->
+  <div class="catalog-controls">
+    <div class="categories-bar" id="categories-bar">
+      <button class="cat-pill active" onclick="filterCatalog('Todas')">Todas</button>
+      <button class="cat-pill" onclick="filterCatalog('Películas')">Películas</button>
+      <button class="cat-pill" onclick="filterCatalog('Series')">Series</button>
+      <button class="cat-pill" onclick="filterCatalog('Fantasía')">Fantasía</button>
+      <button class="cat-pill" onclick="filterCatalog('Sci-Fi')">Ciencia Ficción</button>
+      <button class="cat-pill" onclick="filterCatalog('Comedia')">Comedia</button>
+      <button class="cat-pill" onclick="filterCatalog('Documental')">Documentales</button>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">📺</div>
-        <h3>Android TV & Móvil</h3>
-        <p>Diseño híbrido optimizado tanto para navegación táctil como para mandos D-Pad de Google TV y Android TV.</p>
-      </div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="search-input" placeholder="Buscar título, actor o género..." oninput="handleSearch(this.value)">
+    </div>
+  </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3>Perfiles & Control Parental</h3>
-        <p>Perfiles individuales (Adultos e Infantil con PIN de 4 dígitos) para proteger el contenido familiar.</p>
-      </div>
+  <!-- Movie Catalog Grid -->
+  <main class="section-container">
+    <div class="section-header">
+      <h2 class="section-title" id="catalog-heading">
+        <span>🎬</span> Catálogo PrimePlex
+      </h2>
+      <span style="font-size: 0.85rem; color: var(--text-muted);" id="catalog-count">Cargando títulos...</span>
+    </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">🎬</div>
-        <h3>ExoPlayer Ultra HD</h3>
-        <p>Reproductor nativo de alta velocidad compatible con Google Drive directo, enlaces WordPress MP4 y HLS m3u8.</p>
-      </div>
+    <div class="movie-grid" id="movie-grid">
+      <!-- Populated dynamically via JavaScript -->
+    </div>
+  </main>
 
-      <div class="feature-card">
-        <div class="feature-icon">🔗</div>
-        <h3>App Links & Deep Linking</h3>
-        <p>Cualquier enlace de película compartido se abre al instante en la app oficial de PrimePlex.</p>
+  <!-- App Download Bar -->
+  <section class="app-download-bar" id="download-section">
+    <div class="app-download-inner">
+      <div class="app-download-text">
+        <h3>📱 Descarga PrimePlex para Android & Android TV</h3>
+        <p>
+          Instala el archivo APK oficial en tu smartphone, tablet, proyector o televisor Google TV con soporte para control remoto D-Pad, sincronización en Firebase y aceleración de hardware.
+        </p>
+        <div class="domain-pills">
+          <span class="domain-pill">✓ Dominio GitHub Pages: djyuanyo.github.io</span>
+          <span class="domain-pill">✓ Dominio Firebase: gen-lang-client-0763337447.web.app</span>
+          <span class="domain-pill">✓ App Links Oficial</span>
+        </div>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">✨</div>
-        <h3>Estilo Amazon Prime</h3>
-        <p>Interfaz cinemática inmersiva con animaciones de foco, badges de calificación IMDb y navegación fluida.</p>
+      <div>
+        <a href="https://github.com/djyuanyo/Mencia-Media/releases/latest/download/PrimePlex-debug.apk" class="btn btn-primary" style="padding: 0.85rem 1.6rem; font-size: 1rem;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+          <span>Descargar APK Directo</span>
+        </a>
       </div>
     </div>
   </section>
+
+  <!-- Video Player Modal (Cinema View) -->
+  <div class="player-modal" id="player-modal">
+    <div class="player-header">
+      <div class="player-title-info">
+        <h2 id="modal-player-title">Reproduciendo...</h2>
+        <span id="modal-player-subtitle">PrimePlex Web Player</span>
+      </div>
+      <button class="close-btn" onclick="closePlayerModal()" title="Cerrar reproductor">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+
+    <div class="player-container">
+      <div class="video-viewport" id="video-viewport">
+        <!-- Rendered dynamically: HTML5 <video> or Google Drive <iframe> -->
+      </div>
+
+      <div class="player-details">
+        <div class="player-details-grid">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem;">
+              <span class="imdb-badge" id="modal-movie-rating">8.2 ★</span>
+              <span style="color: var(--text-muted); font-size: 0.9rem;" id="modal-movie-meta">2024 • 120 min</span>
+              <span class="card-badge-cat" id="modal-movie-genre">Películas</span>
+            </div>
+            <p class="player-overview" id="modal-movie-overview">Sinopsis...</p>
+            <div class="player-cast" id="modal-movie-cast"><strong>Reparto:</strong> Actor 1, Actor 2</div>
+
+            <!-- Series Episode Section -->
+            <div class="episodes-section" id="modal-episodes-section" style="display: none;">
+              <h3 class="episodes-title">Episodios Disponibles</h3>
+              <div class="episodes-list" id="modal-episodes-list"></div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+            <button class="btn btn-secondary" onclick="shareCurrentVideo()" style="width: 100%; justify-content: center;">
+              <span>🔗 Compartir Enlace de Reproducción</span>
+            </button>
+            <a id="modal-open-in-app-btn" href="primeplex://" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+              <span>📱 Abrir en App PrimePlex</span>
+            </a>
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.8rem; font-size: 0.8rem; color: var(--text-muted);">
+              💡 <strong>Consejo:</strong> Si usas Google Drive, asegúrate de que el archivo tenga el enlace compartido como <em>"Cualquier persona con el enlace puede ver"</em>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Movie to Cloud Modal -->
+  <div class="player-modal" id="add-movie-modal" style="display: none; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-surface); border: 1px solid rgba(0, 168, 225, 0.4); border-radius: 12px; width: 90%; max-width: 550px; padding: 1.8rem; position: relative;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.3rem; font-weight: 700; color: #FFF;">➕ Añadir Película o Serie</h2>
+        <button class="close-btn" onclick="closeAddMovieModal()">✕</button>
+      </div>
+
+      <form onsubmit="handleAddNewMovie(event)" style="display: flex; flex-direction: column; gap: 0.85rem;">
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Título:</label>
+          <input type="text" id="add-title" required class="quick-input" style="width: 100%;" placeholder="Ej. Dune: Parte Dos">
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Enlace de Video (Google Drive, MP4, etc.):</label>
+          <input type="url" id="add-videourl" required class="quick-input" style="width: 100%;" placeholder="https://drive.google.com/file/d/... o https://...video.mp4">
+        </div>
+        <div style="display: flex; gap: 0.8rem;">
+          <div style="flex: 1;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Categoría:</label>
+            <select id="add-category" class="quick-input" style="width: 100%;">
+              <option value="Películas">Película</option>
+              <option value="Series">Serie</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Género:</label>
+            <input type="text" id="add-genre" class="quick-input" style="width: 100%;" placeholder="Acción, Drama, Sci-Fi">
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.8rem;">
+          <div style="flex: 1;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Año:</label>
+            <input type="text" id="add-year" class="quick-input" style="width: 100%;" placeholder="2026">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Nota IMDb:</label>
+            <input type="text" id="add-imdb" class="quick-input" style="width: 100%;" placeholder="8.5">
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Carátula / Poster URL (opcional):</label>
+          <input type="url" id="add-poster" class="quick-input" style="width: 100%;" placeholder="https://...">
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Sinopsis:</label>
+          <textarea id="add-desc" class="quick-input" style="width: 100%; height: 70px; resize: none;" placeholder="Descripción de la película..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="justify-content: center; margin-top: 0.5rem;">
+          Guardar y Reproducir
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer>
     <p>
-      PrimePlex © 2026 • Dominio Gratuito en <a href="https://djyuanyo.github.io/Mencia-Media/" target="_blank" rel="noopener">GitHub Pages</a> (<code>djyuanyo.github.io/Mencia-Media</code>) & <a href="https://firebase.google.com" target="_blank" rel="noopener">Firebase</a>
+      PrimePlex Web Streaming © 2026 • Dominio Gratuito <a href="https://djyuanyo.github.io/Mencia-Media/" target="_blank">GitHub Pages</a> & <a href="https://gen-lang-client-0763337447.web.app" target="_blank">Firebase</a>
     </p>
   </footer>
 
+  <!-- Application Logic -->
+  <script>
+    // Initial Movie Catalog (mirrors PrimePlex Android database seed & cloud bin)
+    const DEFAULT_MOVIES = [
+      {
+        id: 1,
+        title: "Sintel",
+        description: "La tierna historia de una chica que rescata a un pequeño dragón. Cuando es secuestrado por una bestia colosal, Sintel se embarca en un viaje épico lleno de peligros, sacrificios y aventuras visuales espectaculares.",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1547483238-f400e65ccd56?w=800&q=80",
+        category: "Películas",
+        genre: "Fantasía",
+        year: "2010",
+        duration: "14 min",
+        isFeatured: true,
+        cast: "Halina Reijn, Thom Hoffman",
+        imdbRating: "8.2",
+        trailerUrl: "https://www.youtube.com/watch?v=eRsGyueVLvQ"
+      },
+      {
+        id: 2,
+        title: "Tears of Steel",
+        description: "Cortometraje de ciencia ficción que aborda un mundo distópico en Londres. Un grupo de científicos intenta salvar el planeta del azote de robots descontrolados usando tecnologías y conexiones del pasado.",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+        category: "Películas",
+        genre: "Sci-Fi",
+        year: "2012",
+        duration: "12 min",
+        isFeatured: true,
+        cast: "Derek de Lint, Sergio Hasselbaink, Denise Rebergen",
+        imdbRating: "7.8",
+        trailerUrl: "https://www.youtube.com/watch?v=R6MlUcmOul8"
+      },
+      {
+        id: 3,
+        title: "Big Buck Bunny",
+        description: "La vida de un pacífico conejo gigante da un giro cuando tres traviesas ardillas deciden burlarse de él y estropear su entorno natural. Es hora de darles una lección cómica con trampas del bosque.",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80",
+        category: "Películas",
+        genre: "Comedia",
+        year: "2008",
+        duration: "10 min",
+        isFeatured: false,
+        cast: "Personajes Animados Blender",
+        imdbRating: "8.0",
+        trailerUrl: "https://www.youtube.com/watch?v=YE7VzlLtp-4"
+      },
+      {
+        id: 4,
+        title: "Cosmos: Serie Documental",
+        description: "Una travesía monumental a través del espacio y el tiempo. Exploración científica de las leyes cósmicas, el origen de la vida y el futuro de la humanidad en el universo observable.",
+        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80",
+        category: "Series",
+        genre: "Documental",
+        year: "2020",
+        duration: "3 episodios",
+        isFeatured: false,
+        cast: "Neil deGrasse Tyson, Ann Druyan, Seth MacFarlane",
+        imdbRating: "9.3",
+        episodes: [
+          { seasonNumber: 1, episodeNumber: 1, title: "Hacia las estrellas", overview: "Un viaje al borde del universo conocido comenzando en las playas de Alejandría.", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
+          { seasonNumber: 1, episodeNumber: 2, title: "El río del tiempo y el ADN", overview: "Descubriendo el código molecular que conecta toda la vida terrenal.", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
+          { seasonNumber: 1, episodeNumber: 3, title: "Mundos perdidos y encontrados", overview: "Los secretos geológicos ocultos de los exoplanetas en la Vía Láctea.", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
+        ]
+      },
+      {
+        id: 5,
+        title: "WordPress Showcase Video",
+        description: "Demostración de streaming fluido en la nube, optimizado para reproducción directa y metadatos dinámicos.",
+        videoUrl: "https://vids.wordpress.com/videos/v9_video.mp4",
+        posterUrl: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80",
+        category: "Películas",
+        genre: "Documental",
+        year: "2024",
+        duration: "5 min",
+        isFeatured: false,
+        cast: "WordPress Streaming Team",
+        imdbRating: "7.5"
+      }
+    ];
+
+    let allMovies = [];
+    let currentFilter = "Todas";
+    let searchQuery = "";
+    let currentPlayingMovie = null;
+
+    // Helper: Extract Google Drive file ID
+    function extractGoogleDriveId(url) {
+      if (!url) return null;
+      const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]{20,})/,
+        /[?&]id=([a-zA-Z0-9_-]{20,})/,
+        /(?:open|uc)\?id=([a-zA-Z0-9_-]{20,})/,
+        /\/d\/([a-zA-Z0-9_-]{20,})/
+      ];
+      for (const p of patterns) {
+        const m = url.match(p);
+        if (m && m[1]) return m[1];
+      }
+      return null;
+    }
+
+    // Initialize application
+    async function initApp() {
+      // 1. Load local custom additions if any
+      const localCustom = JSON.parse(localStorage.getItem('primeplex_web_custom_movies') || '[]');
+      allMovies = [...localCustom, ...DEFAULT_MOVIES];
+
+      // 2. Fetch from shared cloud catalog
+      try {
+        const res = await fetch("https://extendsclass.com/api/json-storage/bin/affeded", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.catalog) && data.catalog.length > 0) {
+            data.catalog.forEach(remote => {
+              if (remote && remote.title && !allMovies.some(m => m.title.toLowerCase() === remote.title.toLowerCase())) {
+                allMovies.push({
+                  id: Date.now() + Math.random(),
+                  title: remote.title,
+                  description: remote.description || "Sin descripción.",
+                  videoUrl: remote.videoUrl || "",
+                  posterUrl: remote.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80",
+                  category: remote.category || "Películas",
+                  genre: remote.genre || "Acción",
+                  year: remote.year || "2026",
+                  duration: remote.duration || "120 min",
+                  cast: remote.cast || "",
+                  imdbRating: remote.imdbRating || "8.0",
+                  trailerUrl: remote.trailerUrl || "",
+                  episodes: remote.episodesJson ? JSON.parse(remote.episodesJson) : null
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Could not reach cloud catalog bin:", e);
+      }
+
+      renderHeroBanner(allMovies[0] || DEFAULT_MOVIES[0]);
+      renderCatalog();
+
+      // Check deep linking query parameter (?play=... or ?id=...)
+      checkUrlParams();
+    }
+
+    // Render Hero Movie Banner
+    function renderHeroBanner(movie) {
+      if (!movie) return;
+      document.getElementById('hero-banner').style.backgroundImage = `url('${movie.posterUrl || DEFAULT_MOVIES[0].posterUrl}')`;
+      document.getElementById('hero-title').textContent = movie.title;
+      document.getElementById('hero-rating').textContent = `${movie.imdbRating || "8.0"} ★ IMDb`;
+      document.getElementById('hero-year').textContent = movie.year || "2024";
+      document.getElementById('hero-duration').textContent = movie.duration || "120 min";
+      document.getElementById('hero-genre').textContent = `${movie.category} • ${movie.genre || "Cine"}`;
+      document.getElementById('hero-description').textContent = movie.description || "";
+      window.featuredMovie = movie;
+    }
+
+    function playHeroMovie() {
+      if (window.featuredMovie) {
+        playMovie(window.featuredMovie);
+      }
+    }
+
+    function playHeroTrailer() {
+      if (window.featuredMovie && window.featuredMovie.trailerUrl) {
+        playVideoUrl(window.featuredMovie.trailerUrl, `${window.featuredMovie.title} (Tráiler)`, window.featuredMovie);
+      } else if (window.featuredMovie) {
+        playMovie(window.featuredMovie);
+      }
+    }
+
+    // Render Catalog Grid
+    function renderCatalog() {
+      const grid = document.getElementById('movie-grid');
+      const filtered = allMovies.filter(m => {
+        const matchesCat = (currentFilter === "Todas") 
+          || (m.category === currentFilter) 
+          || (m.genre && m.genre.toLowerCase().includes(currentFilter.toLowerCase()));
+
+        const q = searchQuery.toLowerCase();
+        const matchesSearch = !q 
+          || m.title.toLowerCase().includes(q) 
+          || (m.cast && m.cast.toLowerCase().includes(q)) 
+          || (m.genre && m.genre.toLowerCase().includes(q))
+          || (m.description && m.description.toLowerCase().includes(q));
+
+        return matchesCat && matchesSearch;
+      });
+
+      document.getElementById('catalog-count').textContent = `${filtered.length} títulos disponibles`;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔍</div>
+            <p style="font-size: 1.1rem; color: #FFF; font-weight: 600;">No se encontraron películas o series</p>
+            <p style="font-size: 0.9rem;">Prueba con otra búsqueda o usa el reproductor de enlaces arriba para ver cualquier video de Google Drive o MP4.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(movie => `
+        <div class="movie-card" onclick="openMovieDetails(${JSON.stringify(movie).replace(/"/g, '&quot;')})">
+          <div class="poster-wrapper">
+            <img class="poster-img" src="${movie.posterUrl || 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80'}" alt="${movie.title}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80'">
+            <div class="play-overlay">
+              <div class="play-icon-circle">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+            <div class="card-badges">
+              <span class="card-badge-cat">${movie.category}</span>
+            </div>
+          </div>
+          <div class="movie-info">
+            <div class="movie-card-title" title="${movie.title}">${movie.title}</div>
+            <div class="movie-card-meta">
+              <span>${movie.year} • ${movie.duration}</span>
+              <span class="movie-card-rating">★ ${movie.imdbRating || "8.0"}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Filter handling
+    function filterCatalog(category) {
+      currentFilter = category;
+      document.querySelectorAll('.cat-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === category.toLowerCase());
+      });
+      document.getElementById('catalog-heading').innerHTML = `<span>🎬</span> ${category === 'Todas' ? 'Catálogo PrimePlex' : category}`;
+      renderCatalog();
+    }
+
+    function handleSearch(val) {
+      searchQuery = val.trim();
+      renderCatalog();
+    }
+
+    // Video Player Engine (Google Drive, MP4, HLS, YouTube)
+    function playVideoUrl(url, title = "Reproduciendo", movieData = null) {
+      if (!url) {
+        alert("Enlace de video no válido o vacío.");
+        return;
+      }
+
+      currentPlayingMovie = movieData || { title: title, videoUrl: url, description: "Reproducción directa", year: "2026", duration: "Online" };
+
+      const modal = document.getElementById('player-modal');
+      const viewport = document.getElementById('video-viewport');
+      const titleElem = document.getElementById('modal-player-title');
+      const subElem = document.getElementById('modal-player-subtitle');
+
+      titleElem.textContent = title;
+      subElem.textContent = movieData ? `${movieData.category || "Video"} • ${movieData.genre || "PrimePlex"}` : "Transmisión Web Directa";
+
+      // Populate details
+      document.getElementById('modal-movie-rating').textContent = `${(movieData && movieData.imdbRating) || "8.0"} ★`;
+      document.getElementById('modal-movie-meta').textContent = `${(movieData && movieData.year) || "2026"} • ${(movieData && movieData.duration) || "Online"}`;
+      document.getElementById('modal-movie-genre').textContent = (movieData && movieData.genre) || "Streaming";
+      document.getElementById('modal-movie-overview').textContent = (movieData && movieData.description) || "Reproducción de video desde el enlace proporcionado.";
+      document.getElementById('modal-movie-cast').innerHTML = movieData && movieData.cast ? `<strong>Reparto:</strong> ${movieData.cast}` : "";
+
+      // Series episodes
+      const epSection = document.getElementById('modal-episodes-section');
+      const epList = document.getElementById('modal-episodes-list');
+      if (movieData && movieData.episodes && movieData.episodes.length > 0) {
+        epSection.style.display = "block";
+        epList.innerHTML = movieData.episodes.map((ep, idx) => `
+          <div class="episode-item ${ep.videoUrl === url ? 'active' : ''}" onclick="playVideoUrl('${ep.videoUrl || movieData.videoUrl}', '${movieData.title} - T${ep.seasonNumber}E${ep.episodeNumber}: ${ep.title}', ${JSON.stringify(movieData).replace(/"/g, '&quot;')})">
+            <div class="episode-meta">
+              <span class="episode-num">Temporada ${ep.seasonNumber} • Episodio ${ep.episodeNumber}</span>
+              <span class="episode-name">${ep.title}</span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">${ep.runtime || "45 min"}</span>
+          </div>
+        `).join('');
+      } else {
+        epSection.style.display = "none";
+      }
+
+      // Check URL type
+      const driveId = extractGoogleDriveId(url);
+      const isYoutube = url.includes("youtube.com") || url.includes("youtu.be");
+
+      if (driveId) {
+        // Embed official Google Drive preview player (seamless web streaming)
+        viewport.innerHTML = `
+          <iframe 
+            src="https://drive.google.com/file/d/${driveId}/preview" 
+            class="iframe-element" 
+            allow="autoplay; fullscreen" 
+            allowfullscreen>
+          </iframe>
+        `;
+      } else if (isYoutube) {
+        let ytId = "";
+        const m = url.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/);
+        if (m && m[1]) ytId = m[1];
+        viewport.innerHTML = `
+          <iframe 
+            src="https://www.youtube.com/embed/${ytId}?autoplay=1" 
+            class="iframe-element" 
+            allow="autoplay; encrypted-media; fullscreen" 
+            allowfullscreen>
+          </iframe>
+        `;
+      } else {
+        // Direct video stream: MP4, WebM, HLS
+        viewport.innerHTML = `
+          <video 
+            src="${url}" 
+            class="video-element" 
+            controls 
+            autoplay 
+            playsinline 
+            controlsList="nodownload">
+            Tu navegador no soporta el reproductor de video HTML5.
+          </video>
+        `;
+      }
+
+      modal.classList.add('open');
+      document.body.style.overflow = "hidden";
+    }
+
+    function openMovieDetails(movie) {
+      playMovie(movie);
+    }
+
+    function playMovie(movie) {
+      if (movie.episodes && movie.episodes.length > 0) {
+        const firstEp = movie.episodes[0];
+        playVideoUrl(firstEp.videoUrl || movie.videoUrl, `${movie.title} - T${firstEp.seasonNumber}E${firstEp.episodeNumber}: ${firstEp.title}`, movie);
+      } else {
+        playVideoUrl(movie.videoUrl, movie.title, movie);
+      }
+    }
+
+    function playCustomUrl() {
+      const input = document.getElementById('quick-url-input');
+      const url = input.value.trim();
+      if (!url) {
+        alert("Por favor pega un enlace de Google Drive o video.");
+        input.focus();
+        return;
+      }
+      playVideoUrl(url, "Video Directo");
+    }
+
+    function closePlayerModal() {
+      const modal = document.getElementById('player-modal');
+      const viewport = document.getElementById('video-viewport');
+      viewport.innerHTML = ""; // Stop audio/video
+      modal.classList.remove('open');
+      document.body.style.overflow = "auto";
+    }
+
+    function focusQuickPlayer() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.getElementById('quick-url-input').focus();
+    }
+
+    function scrollToDownload() {
+      document.getElementById('download-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function shareCurrentVideo() {
+      if (!currentPlayingMovie) return;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?play=${encodeURIComponent(currentPlayingMovie.videoUrl)}&title=${encodeURIComponent(currentPlayingMovie.title)}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("¡Enlace copiado al portapapeles!\nCualquier persona que lo abra reproducirá este video al instante.");
+      }).catch(() => {
+        prompt("Copia este enlace para compartir:", shareUrl);
+      });
+    }
+
+    // Modal Add Movie
+    function openAddMovieModal() {
+      document.getElementById('add-movie-modal').style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeAddMovieModal() {
+      document.getElementById('add-movie-modal').style.display = "none";
+      document.body.style.overflow = "auto";
+    }
+
+    function handleAddNewMovie(e) {
+      e.preventDefault();
+      const title = document.getElementById('add-title').value.trim();
+      const videoUrl = document.getElementById('add-videourl').value.trim();
+      const category = document.getElementById('add-category').value;
+      const genre = document.getElementById('add-genre').value.trim() || "Cine";
+      const year = document.getElementById('add-year').value.trim() || "2026";
+      const imdbRating = document.getElementById('add-imdb').value.trim() || "8.0";
+      const posterUrl = document.getElementById('add-poster').value.trim() || "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80";
+      const description = document.getElementById('add-desc').value.trim() || "Añadida por el usuario.";
+
+      const newMovie = {
+        id: Date.now(),
+        title,
+        videoUrl,
+        category,
+        genre,
+        year,
+        duration: "120 min",
+        imdbRating,
+        posterUrl,
+        description,
+        isFeatured: false
+      };
+
+      // Save locally
+      const localCustom = JSON.parse(localStorage.getItem('primeplex_web_custom_movies') || '[]');
+      localCustom.unshift(newMovie);
+      localStorage.setItem('primeplex_web_custom_movies', JSON.stringify(localCustom));
+
+      allMovies.unshift(newMovie);
+      renderCatalog();
+      closeAddMovieModal();
+      playMovie(newMovie);
+    }
+
+    // Deep link query parameters check
+    function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const playUrl = params.get('play');
+      const movieTitle = params.get('title') || "Película en Streaming";
+      const driveId = params.get('drive');
+      const movieId = params.get('id');
+
+      if (playUrl) {
+        playVideoUrl(playUrl, movieTitle);
+      } else if (driveId) {
+        playVideoUrl(`https://drive.google.com/file/d/${driveId}/view`, movieTitle);
+      } else if (movieId) {
+        const found = allMovies.find(m => String(m.id) === String(movieId));
+        if (found) {
+          playMovie(found);
+        }
+      }
+    }
+
+    // Close modals on Escape key
+    window.addEventListener('keydown', (e) => {
+      if (e.key === "Escape") {
+        closePlayerModal();
+        closeAddMovieModal();
+      }
+    });
+
+    // Start on load
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
 </body>
 </html>
